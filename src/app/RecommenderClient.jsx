@@ -139,7 +139,9 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
   const [recommendations, setRecommendations] = useState([]);
   // NEW: State to store the random game recommendation
   const [randomGameRecommendation, setRandomGameRecommendation] = useState(null);
-
+  // Removed states for modal control
+  // const [isModalOpen, setIsModalOpen] = useState(false);
+  // const [selectedGameForModal, setSelectedGameForModal] = useState(null);
 
   // Function to extract unique tags (genres or play styles or themes) from the game data
   const extractUniqueTags = (games, type) => {
@@ -165,6 +167,8 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
     setErrorMessage('');
     setRecommendations([]);
     setRandomGameRecommendation(null); // Clear random game when generating specific recs
+    // Removed modal close on recommendation generation
+    // setIsModalOpen(false);
 
     // Simulate API call delay for recommendation generation
     await new Promise(resolve => setTimeout(resolve, 1500));
@@ -235,6 +239,8 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
     setErrorMessage('');
     setRecommendations([]); // Clear specific recommendations
     setRandomGameRecommendation(null); // Clear previous random game
+    // Removed modal close on random generation
+    // setIsModalOpen(false);
 
     await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate delay
 
@@ -253,6 +259,29 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
       setIsLoading(false);
     }
   };
+
+  // NEW: Function to clear all selected filters
+  const clearAllFilters = () => {
+    setSelectedGenres([]);
+    setSelectedPlayStyles([]);
+    setSelectedTheme([]);
+    setErrorMessage('');
+    setRecommendations([]);
+    setRandomGameRecommendation(null);
+    // Removed modal close on clear filters
+    // setIsModalOpen(false);
+  };
+
+  // Removed functions for modal control
+  // const openGameModal = (game) => {
+  //   setSelectedGameForModal(game);
+  //   setIsModalOpen(true);
+  // };
+
+  // const closeGameModal = () => {
+  //   setIsModalOpen(false);
+  //   setSelectedGameForModal(null);
+  // };
 
 
   // Render error state if games data failed to load in the Server Component
@@ -356,6 +385,18 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
           </button>
         </div>
 
+        {/* NEW: Clear All Filters Button */}
+        {(selectedGenres.length > 0 || selectedPlayStyles.length > 0 || selectedTheme.length > 0 || recommendations.length > 0 || randomGameRecommendation) && (
+          <div className="text-center mt-4">
+            <button
+              onClick={clearAllFilters}
+              className="text-gray-500 hover:text-gray-800 text-sm font-medium focus:outline-none transition duration-200 ease-in-out cursor-pointer"
+            >
+              Clear All Filters & Recommendations
+            </button>
+          </div>
+        )}
+
 
         {errorMessage && (
           <div className="mt-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg text-center text-base" role="alert">
@@ -370,11 +411,8 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
               Your Random Pick:
             </h2>
             <div className="space-y-4">
-              <a
-                key={randomGameRecommendation.id}
-                href={randomGameRecommendation.link || "#"}
-                target="_blank"
-                rel="noopener noreferrer"
+              <div
+                // Removed onClick to open modal
                 className="block bg-gray-50 p-5 rounded-lg shadow-md border border-gray-200 hover:border-purple-400 transition duration-200 ease-in-out transform hover:-translate-y-1 cursor-pointer"
               >
                 <h3 className="text-xl font-semibold text-purple-700 mb-1">{randomGameRecommendation.name}</h3>
@@ -389,7 +427,18 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
                     <span className="font-medium">Theme:</span> {randomGameRecommendation.theme}
                   </p>
                 )}
-              </a>
+                {/* NEW: Added Roblox link directly to the card */}
+                {randomGameRecommendation.link && (
+                  <a
+                    href={randomGameRecommendation.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 inline-block bg-blue-500 text-white font-bold py-2 px-4 rounded-lg shadow hover:bg-blue-600 transition duration-200 ease-in-out text-sm"
+                  >
+                    Play on Roblox
+                  </a>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -402,11 +451,9 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
             </h2>
             <div className="space-y-4">
               {recommendations.map((game) => (
-                <a
+                <div
                   key={game.id}
-                  href={game.link || "#"}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  // Removed onClick to open modal
                   className="block bg-gray-50 p-5 rounded-lg shadow-md border border-gray-200 hover:border-purple-400 transition duration-200 ease-in-out transform hover:-translate-y-1 cursor-pointer"
                 >
                   <h3 className="text-xl font-semibold text-purple-700 mb-1">{game.name}</h3>
@@ -421,12 +468,26 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
                       <span className="font-medium">Theme:</span> {game.theme}
                     </p>
                   )}
-                </a>
+                  {/* NEW: Added Roblox link directly to the card */}
+                  {game.link && (
+                    <a
+                      href={game.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-3 inline-block bg-blue-500 text-white font-bold py-2 px-4 rounded-lg shadow hover:bg-blue-600 transition duration-200 ease-in-out text-sm"
+                    >
+                      Play on Roblox
+                    </a>
+                  )}
+                </div>
               ))}
             </div>
           </div>
         )}
       </div>
+
+      {/* Removed Game Details Modal */}
+      {/* <GameDetailsModal game={selectedGameForModal} onClose={closeGameModal} /> */}
     </div>
   );
 }
