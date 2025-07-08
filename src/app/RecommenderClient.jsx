@@ -123,27 +123,146 @@ const MultiSelectDropdown = ({ options, selectedOptions, onSelect, limit, label 
   );
 };
 
+// HelpModal Component
+const HelpModal = ({ onClose }) => {
+  return (
+    <div className="fixed inset-0 bg-gradient-to-br from-purple-800 to-indigo-900 bg-opacity-75 flex items-center justify-center z-50 p-4"> {/* Changed background */}
+      <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md relative transform transition-all duration-300 scale-100 opacity-100">
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 text-gray-500 hover:text-gray-800 text-2xl font-bold focus:outline-none"
+          aria-label="Close help modal"
+        >
+          &times;
+        </button>
+        <h2 className="text-3xl font-bold text-purple-700 mb-4 text-center">How to Use This Recommender</h2>
+        <div className="text-gray-700 text-base space-y-3">
+          <p>This tool helps you discover new Roblox games based on your preferences!</p>
+          <ol className="list-decimal list-inside space-y-2">
+            <li>
+              <strong>Search:</strong> Type a game name, genre, play style, or theme into the search bar to find specific games.
+            </li>
+            <li>
+              <strong>Filter by Preferences:</strong>
+              <ul className="list-disc list-inside ml-4">
+                <li>Select up to 2 "Preferred Genres" (e.g., Action, Simulation).</li>
+                <li>Select up to 2 "Preferred Play Styles" (e.g., Competitive, Casual).</li>
+              </ul>
+            </li>
+            <li>
+              <strong>Get Recommendations:</strong>
+              <ul className="list-disc list-inside ml-4">
+                <li>Click "Get Smart Recommendations" to see games tailored to your selections and/or search.</li>
+                <li>Click "Get a Random Game" for a surprise pick from the database (filtered by search if active).</li>
+              </ul>
+            </li>
+            <li>
+              <strong>Explore & Play:</strong> Click on any recommended game card to see its details and find a link to play on Roblox!
+            </li>
+            <li>
+              <strong>Reset:</strong> Use "Clear All Filters & Recommendations" to start fresh.
+            </li>
+          </ol>
+          <p className="mt-4 text-sm text-gray-500 text-center">
+            Database updated weekly, last updated July 6th.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Removed BuyMeACoffeeModal Component
+// const BuyMeACoffeeModal = ({ onClose }) => {
+//   const buyMeACoffeeLink = "https://www.buymeacoffee.com/YOUR_BUYMEACOFFEE_USERNAME";
+//   return (
+//     <div className="fixed inset-0 bg-gradient-to-br from-purple-800 to-indigo-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
+//       <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md relative transform transition-all duration-300 scale-100 opacity-100 text-center">
+//         <button
+//           onClick={onClose}
+//           className="absolute top-3 right-3 text-gray-500 hover:text-gray-800 text-2xl font-bold focus:outline-none"
+//           aria-label="Close Buy Me a Coffee modal"
+//         >
+//           &times;
+//         </button>
+//         <h2 className="text-3xl font-bold text-purple-700 mb-4">Support This Project! ☕</h2>
+//         <p className="text-gray-700 text-base mb-6">
+//           Enjoying the Roblox Game Recommender? Your support helps keep this website running and allows for future improvements!
+//         </p>
+//         <a
+//           href={buyMeACoffeeLink}
+//           target="_blank"
+//           rel="noopener noreferrer"
+//           className="inline-block bg-yellow-400 text-yellow-900 font-bold py-3 px-6 rounded-lg shadow-lg hover:bg-yellow-500 transition duration-300 ease-in-out text-xl transform hover:scale-105"
+//         >
+//           Buy Me a Coffee!
+//         </a>
+//         <p className="text-gray-500 text-sm mt-4">Thank you for your generosity!</p>
+//       </div>
+//     </div>
+//   );
+// };
+
+// FutureUpdatesModal Component
+const FutureUpdatesModal = ({ onClose }) => {
+  return (
+    <div className="fixed inset-0 bg-gradient-to-br from-purple-800 to-indigo-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md relative transform transition-all duration-300 scale-100 opacity-100">
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 text-gray-500 hover:text-gray-800 text-2xl font-bold focus:outline-none"
+          aria-label="Close future updates modal"
+        >
+          &times;
+        </button>
+        <h2 className="text-3xl font-bold text-purple-700 mb-4 text-center">What's Next?</h2>
+        <div className="text-gray-700 text-base space-y-3">
+          <p>We're always working to improve your experience! Here are some ideas we're exploring for future updates:</p>
+          <ul className="list-disc list-inside space-y-2">
+            <li>
+              <strong>Tiers:</strong> We're looking to add a paid tier with some benefits (no ads, more filters, and access to curated lists!)
+            </li>
+            <li>
+              <strong>Advanced AI Recommendations:</strong> Implement description based recommendations.
+            </li>
+            <li>
+              <strong>Sponsorships:</strong> We'll accept sponsors and promote games directly on the site.
+            </li>
+          </ul>
+          <p className="mt-4 text-sm text-gray-500 text-center">
+            Got an idea? Let us know!
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 
 // RecommenderClient is now a Client Component
 export default function RecommenderClient({ gamesData, gamesLoadError }) { // Accept gamesLoadError prop
   // State to store selected genres and play styles
   const [selectedGenres, setSelectedGenres] = useState([]);
   const [selectedPlayStyles, setSelectedPlayStyles] = useState([]);
-  // NEW: State to store selected theme
-  const [selectedTheme, setSelectedTheme] = useState([]); // Limit 1, so it will be an array of 0 or 1 item
   // State for loading indicator for recommendations
   const [isLoading, setIsLoading] = useState(false);
   // State for error messages
   const [errorMessage, setErrorMessage] = useState('');
   // State to store the recommended games
   const [recommendations, setRecommendations] = useState([]);
-  // NEW: State to store the random game recommendation
+  // State to store the random game recommendation
   const [randomGameRecommendation, setRandomGameRecommendation] = useState(null);
-  // Removed states for modal control
-  // const [isModalOpen, setIsModalOpen] = useState(false);
-  // const [selectedGameForModal, setSelectedGameForModal] = useState(null);
+  // State for search term
+  const [searchTerm, setSearchTerm] = useState('');
+  // State to control help modal visibility
+  const [showHelpModal, setShowHelpModal] = useState(false);
+  // Removed state for Buy Me a Coffee modal visibility
+  // const [showBuyMeACoffeeModal, setShowBuyMeACoffeeModal] = useState(false);
+  // State to control Future Updates modal visibility
+  const [showFutureUpdatesModal, setShowFutureUpdatesModal] = useState(false);
 
-  // Function to extract unique tags (genres or play styles or themes) from the game data
+
+  // Function to extract unique tags (genres or play styles) from the game data
   const extractUniqueTags = (games, type) => {
     const tags = new Set();
     games.forEach(game => {
@@ -156,10 +275,9 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
     return Array.from(tags).sort();
   };
 
-  // Dynamically get all unique genres, play styles, and themes from the fetched game data
+  // Dynamically get all unique genres and play styles from the fetched game data
   const allAvailableGenres = extractUniqueTags(gamesData, 'genre');
   const allAvailablePlayStyles = extractUniqueTags(gamesData, 'playStyle');
-  const allAvailableThemes = extractUniqueTags(gamesData, 'theme'); // NEW: For themes
 
   // Function to generate recommendations based on user input
   const generateRecommendations = async () => {
@@ -167,24 +285,32 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
     setErrorMessage('');
     setRecommendations([]);
     setRandomGameRecommendation(null); // Clear random game when generating specific recs
-    // Removed modal close on recommendation generation
-    // setIsModalOpen(false);
 
     // Simulate API call delay for recommendation generation
     await new Promise(resolve => setTimeout(resolve, 1500));
 
     try {
-      if (selectedGenres.length === 0 && selectedPlayStyles.length === 0 && selectedTheme.length === 0) {
-        setErrorMessage("Please select at least one preferred genre, play style, or theme to get recommendations.");
+      // Adjusted validation: require at least one genre or play style selected, or a search term
+      if (selectedGenres.length === 0 && selectedPlayStyles.length === 0 && !searchTerm.trim()) {
+        setErrorMessage("Please select at least one preferred genre or play style, or enter a search term to get recommendations.");
         setIsLoading(false);
         return;
       }
 
-      const scoredGames = gamesData.map(game => {
+      // Filter games by search term first
+      const lowerSearchTerm = searchTerm.toLowerCase().trim();
+      const searchedGames = gamesData.filter(game =>
+        game.name.toLowerCase().includes(lowerSearchTerm) ||
+        game.genre.toLowerCase().includes(lowerSearchTerm) ||
+        game.playStyle.toLowerCase().includes(lowerSearchTerm) ||
+        (game.theme && game.theme.toLowerCase().includes(lowerSearchTerm))
+      );
+
+      const scoredGames = searchedGames.map(game => {
         let score = 0;
         const gameGenres = typeof game.genre === 'string' ? game.genre.toLowerCase().split(',').map(g => g.trim()) : [];
         const gamePlayStyles = typeof game.playStyle === 'string' ? game.playStyle.toLowerCase().split(',').map(s => s.trim()) : [];
-        const gameThemes = typeof game.theme === 'string' ? game.theme.toLowerCase().split(',').map(t => t.trim()) : []; // NEW: For themes
+        const gameThemes = typeof game.theme === 'string' ? game.theme.toLowerCase().split(',').map(t => t.trim()) : [];
 
         // Score based on genre matches
         selectedGenres.forEach(selectedGenre => {
@@ -202,16 +328,21 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
           }
         });
 
-        // NEW: Score based on theme matches (higher weight as it's a single selection)
-        selectedTheme.forEach(selectedThemeItem => {
-          const lowerSelectedTheme = selectedThemeItem.toLowerCase();
-          if (gameThemes.some(t => t.includes(lowerSelectedTheme))) {
-            score += 12; // Higher score for theme match
-          }
-        });
+        // Add score for theme matches (if theme filter was present, or for general relevance)
+        // This part of scoring is now more general, as theme filter is removed from UI.
+        // If the game's theme contains the search term, add a bonus.
+        if (game.theme && lowerSearchTerm && game.theme.toLowerCase().includes(lowerSearchTerm)) {
+             score += 5; // Small bonus if search term matches theme
+        }
 
-        if (score > 0) {
-          score += 1;
+        // Ensure a game that was found by the initial `searchedGames` filter
+        // or by any dropdown filter gets at least a score of 1 to be included in recommendations.
+        // This is crucial for search-only results.
+        if (score > 0 || (lowerSearchTerm && (game.name.toLowerCase().includes(lowerSearchTerm) ||
+                                              game.genre.toLowerCase().includes(lowerSearchTerm) ||
+                                              game.playStyle.toLowerCase().includes(lowerSearchTerm) ||
+                                              (game.theme && game.theme.toLowerCase().includes(lowerSearchTerm))))) {
+            score = Math.max(score, 1); // Ensure minimum score of 1 if any criteria met
         }
 
         return { ...game, score };
@@ -221,7 +352,7 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
       const topRecommendations = sortedGames.filter(game => game.score > 0).slice(0, 5);
 
       if (topRecommendations.length === 0) {
-        setErrorMessage("No games found matching your preferences. Try different selections!");
+        setErrorMessage("No games found matching your preferences or search term. Try different selections!");
       } else {
         setRecommendations(topRecommendations);
       }
@@ -233,25 +364,32 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
     }
   };
 
-  // NEW: Function to get a random game recommendation
+  // Function to get a random game recommendation
   const generateRandomRecommendation = async () => {
     setIsLoading(true);
     setErrorMessage('');
     setRecommendations([]); // Clear specific recommendations
     setRandomGameRecommendation(null); // Clear previous random game
-    // Removed modal close on random generation
-    // setIsModalOpen(false);
 
     await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate delay
 
     try {
-      if (gamesData.length === 0) {
-        setErrorMessage("No game data available to pick a random game.");
+      // Filter games by search term before picking random
+      const lowerSearchTerm = searchTerm.toLowerCase().trim();
+      const gamesToPickFrom = gamesData.filter(game =>
+        game.name.toLowerCase().includes(lowerSearchTerm) ||
+        game.genre.toLowerCase().includes(lowerSearchTerm) ||
+        game.playStyle.toLowerCase().includes(lowerSearchTerm) ||
+        (game.theme && game.theme.toLowerCase().includes(lowerSearchTerm))
+      );
+
+      if (gamesToPickFrom.length === 0) {
+        setErrorMessage("No games found matching your search term to pick a random game.");
         setIsLoading(false);
         return;
       }
-      const randomIndex = Math.floor(Math.random() * gamesData.length);
-      setRandomGameRecommendation(gamesData[randomIndex]);
+      const randomIndex = Math.floor(Math.random() * gamesToPickFrom.length);
+      setRandomGameRecommendation(gamesToPickFrom[randomIndex]);
     } catch (error) {
       console.error('Error generating random recommendation:', error);
       setErrorMessage('An unexpected error occurred while picking a random game.');
@@ -260,28 +398,27 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
     }
   };
 
-  // NEW: Function to clear all selected filters
+  // Function to clear all selected filters and search term
   const clearAllFilters = () => {
     setSelectedGenres([]);
     setSelectedPlayStyles([]);
-    setSelectedTheme([]);
+    setSearchTerm(''); // Clear search term
     setErrorMessage('');
     setRecommendations([]);
     setRandomGameRecommendation(null);
-    // Removed modal close on clear filters
-    // setIsModalOpen(false);
   };
 
-  // Removed functions for modal control
-  // const openGameModal = (game) => {
-  //   setSelectedGameForModal(game);
-  //   setIsModalOpen(true);
-  // };
+  // Functions to open and close the help modal
+  const openHelpModal = () => setShowHelpModal(true);
+  const closeHelpModal = () => setShowHelpModal(false);
 
-  // const closeGameModal = () => {
-  //   setIsModalOpen(false);
-  //   setSelectedGameForModal(null);
-  // };
+  // Removed functions to open and close the Buy Me a Coffee modal
+  // const openBuyMeACoffeeModal = () => setShowBuyMeACoffeeModal(true);
+  // const closeBuyMeACoffeeModal = () => setShowBuyMeACoffeeModal(false);
+
+  // Functions to open and close the Future Updates modal
+  const openFutureUpdatesModal = () => setShowFutureUpdatesModal(true);
+  const closeFutureUpdatesModal = () => setShowFutureUpdatesModal(false);
 
 
   // Render error state if games data failed to load in the Server Component
@@ -306,11 +443,59 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
           </span> 🎮
         </h1>
 
-        <p className="text-center text-gray-600 mb-8 text-lg">
-          Discover your next favorite Roblox game! Select your preferences below.
+        <p className="text-center text-gray-600 mb-4 text-lg">
+          Discover your next favorite Roblox game! Select your preferences below or search directly.
           <br className="hidden sm:inline" /> {/* Line break for smaller screens */}
           <span className="text-sm text-gray-500">Database updated weekly, last updated July 6th.</span>
         </p>
+
+        {/* How to Use Button */}
+        <div className="text-center mb-4"> {/* Adjusted margin-bottom */}
+          <button
+            onClick={openHelpModal}
+            className="text-purple-600 hover:text-purple-800 text-base font-medium focus:outline-none transition duration-200 ease-in-out cursor-pointer"
+          >
+            How to Use This Website?
+          </button>
+        </div>
+
+        {/* Removed Support Us Button */}
+        {/* <div className="text-center mb-4">
+          <button
+            onClick={openBuyMeACoffeeModal}
+            className="text-yellow-600 hover:text-yellow-800 text-base font-medium focus:outline-none transition duration-200 ease-in-out cursor-pointer"
+          >
+            Support Us! ☕
+          </button>
+        </div> */}
+
+        {/* Future Updates Button */}
+        <div className="text-center mb-8">
+          <button
+            onClick={openFutureUpdatesModal}
+            className="text-blue-600 hover:text-blue-800 text-base font-medium focus:outline-none transition duration-200 ease-in-out cursor-pointer"
+          >
+            Future Updates
+          </button>
+        </div>
+
+
+        {/* Search Bar */}
+        <div className="mb-6">
+          <label htmlFor="gameSearch" className="block text-gray-700 text-lg font-semibold mb-2">
+            Search for a game by name, genre, or style:
+          </label>
+          <input
+            type="text"
+            id="gameSearch"
+            className="w-full px-4 py-3 rounded-lg border-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-800 text-base transition duration-200 ease-in-out"
+            placeholder="e.g., Adopt Me, horror, PvP"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            aria-label="Search for games"
+          />
+        </div>
+
 
         <div className="mb-6">
           <MultiSelectDropdown
@@ -332,23 +517,12 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
           />
         </div>
 
-        {/* NEW: Theme Filter */}
-        <div className="mb-8">
-          <MultiSelectDropdown
-            label="Preferred Theme"
-            options={allAvailableThemes}
-            selectedOptions={selectedTheme}
-            onSelect={setSelectedTheme}
-            limit={1} // Limit to 1 selection for theme
-          />
-        </div>
-
-
         <div className="flex flex-col sm:flex-row gap-4 mb-8">
           <button
             onClick={generateRecommendations}
-            disabled={isLoading || (selectedGenres.length === 0 && selectedPlayStyles.length === 0 && selectedTheme.length === 0)}
-            className={`flex-1 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg hover:from-blue-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition duration-300 ease-in-out text-xl transform hover:scale-105 ${isLoading || (selectedGenres.length === 0 && selectedPlayStyles.length === 0 && selectedTheme.length === 0) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+            // Adjusted disabled condition to include search term
+            disabled={isLoading || (selectedGenres.length === 0 && selectedPlayStyles.length === 0 && !searchTerm.trim())}
+            className={`flex-1 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg hover:from-blue-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition duration-300 ease-in-out text-xl transform hover:scale-105 ${isLoading || (selectedGenres.length === 0 && selectedPlayStyles.length === 0 && !searchTerm.trim()) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
             aria-live="polite"
           >
             {isLoading ? (
@@ -364,7 +538,7 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
             )}
           </button>
 
-          {/* NEW: Get a Random Game Button */}
+          {/* Get a Random Game Button */}
           <button
             onClick={generateRandomRecommendation}
             disabled={isLoading || gamesData.length === 0}
@@ -385,8 +559,8 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
           </button>
         </div>
 
-        {/* NEW: Clear All Filters Button */}
-        {(selectedGenres.length > 0 || selectedPlayStyles.length > 0 || selectedTheme.length > 0 || recommendations.length > 0 || randomGameRecommendation) && (
+        {/* Clear All Filters Button */}
+        {(selectedGenres.length > 0 || selectedPlayStyles.length > 0 || searchTerm.trim() || recommendations.length > 0 || randomGameRecommendation) && (
           <div className="text-center mt-4">
             <button
               onClick={clearAllFilters}
@@ -411,9 +585,12 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
               Your Random Pick:
             </h2>
             <div className="space-y-4">
-              <div
-                // Removed onClick to open modal
-                className="block bg-gray-50 p-5 rounded-lg shadow-md border border-gray-200 hover:border-purple-400 transition duration-200 ease-in-out transform hover:-translate-y-1 cursor-pointer"
+              <a
+                key={randomGameRecommendation.id}
+                href={randomGameRecommendation.link || "#"}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block bg-purple-50 p-5 rounded-lg shadow-md border border-purple-200 hover:border-purple-400 transition duration-200 ease-in-out transform hover:-translate-y-1 cursor-pointer"
               >
                 <h3 className="text-xl font-semibold text-purple-700 mb-1">{randomGameRecommendation.name}</h3>
                 <p className="text-gray-700 text-sm">
@@ -427,7 +604,6 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
                     <span className="font-medium">Theme:</span> {randomGameRecommendation.theme}
                   </p>
                 )}
-                {/* NEW: Added Roblox link directly to the card */}
                 {randomGameRecommendation.link && (
                   <a
                     href={randomGameRecommendation.link}
@@ -438,7 +614,7 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
                     Play on Roblox
                   </a>
                 )}
-              </div>
+              </a>
             </div>
           </div>
         )}
@@ -451,10 +627,12 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
             </h2>
             <div className="space-y-4">
               {recommendations.map((game) => (
-                <div
+                <a
                   key={game.id}
-                  // Removed onClick to open modal
-                  className="block bg-gray-50 p-5 rounded-lg shadow-md border border-gray-200 hover:border-purple-400 transition duration-200 ease-in-out transform hover:-translate-y-1 cursor-pointer"
+                  href={game.link || "#"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block bg-purple-50 p-5 rounded-lg shadow-md border border-purple-200 hover:border-purple-400 transition duration-200 ease-in-out transform hover:-translate-y-1 cursor-pointer"
                 >
                   <h3 className="text-xl font-semibold text-purple-700 mb-1">{game.name}</h3>
                   <p className="text-gray-700 text-sm">
@@ -468,7 +646,6 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
                       <span className="font-medium">Theme:</span> {game.theme}
                     </p>
                   )}
-                  {/* NEW: Added Roblox link directly to the card */}
                   {game.link && (
                     <a
                       href={game.link}
@@ -479,15 +656,15 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
                       Play on Roblox
                     </a>
                   )}
-                </div>
+                </a>
               ))}
             </div>
           </div>
         )}
       </div>
 
-      {/* Removed Game Details Modal */}
-      {/* <GameDetailsModal game={selectedGameForModal} onClose={closeGameModal} /> */}
+      {showHelpModal && <HelpModal onClose={closeHelpModal} />}
+      {showFutureUpdatesModal && <FutureUpdatesModal onClose={closeFutureUpdatesModal} />} {/* NEW: Render FutureUpdatesModal */}
     </div>
   );
 }
