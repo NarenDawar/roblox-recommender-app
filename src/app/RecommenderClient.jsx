@@ -2,11 +2,8 @@
 'use client' // This directive is crucial for a Client Component
 
 import React, { useState, useEffect, useRef } from 'react';
-// Removed client-side Firebase imports, as data is passed as prop
 
 // MultiSelectDropdown Component
-// This component handles rendering a dropdown with filterable options,
-// allowing multiple selections up to a specified limit.
 const MultiSelectDropdown = ({ options, selectedOptions, onSelect, limit, label }) => {
   const [isOpen, setIsOpen] = useState(false); // State to control dropdown visibility
   const [searchTerm, setSearchTerm] = useState(''); // State for filtering options
@@ -36,23 +33,20 @@ const MultiSelectDropdown = ({ options, selectedOptions, onSelect, limit, label 
     let newSelection;
 
     if (isSelected) {
-      // Deselect option
       newSelection = selectedOptions.filter(item => item !== option);
     } else {
-      // Select option, if limit is not reached
       if (selectedOptions.length < limit) {
         newSelection = [...selectedOptions, option];
       } else {
-        // If limit is 1, selecting a new option replaces the old one
         if (limit === 1) {
           newSelection = [option];
         } else {
           console.warn(`Selection limit of ${limit} reached for ${label}.`);
-          return; // Do not update selection if limit is hit for multi-select
+          return;
         }
       }
     }
-    onSelect(newSelection); // Call the parent's selection handler
+    onSelect(newSelection);
   };
 
   return (
@@ -126,7 +120,7 @@ const MultiSelectDropdown = ({ options, selectedOptions, onSelect, limit, label 
 // HelpModal Component
 const HelpModal = ({ onClose }) => {
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-purple-800 to-indigo-900 bg-opacity-75 flex items-center justify-center z-50 p-4"> {/* Changed background */}
+    <div className="fixed inset-0 bg-gradient-to-br from-purple-800 to-indigo-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md relative transform transition-all duration-300 scale-100 opacity-100">
         <button
           onClick={onClose}
@@ -157,7 +151,7 @@ const HelpModal = ({ onClose }) => {
               </ul>
             </li>
             <li>
-              <strong>Explore & Play:</strong> Click on any recommended game card to see its details and find a link to play on Roblox!
+              <strong>Explore & Play:</strong> All game cards have a "Play On Roblox" link which will open the game on the Roblox site.
             </li>
             <li>
               <strong>Reset:</strong> Use "Clear All Filters & Recommendations" to start fresh.
@@ -171,37 +165,6 @@ const HelpModal = ({ onClose }) => {
     </div>
   );
 };
-
-// Removed BuyMeACoffeeModal Component
-// const BuyMeACoffeeModal = ({ onClose }) => {
-//   const buyMeACoffeeLink = "https://www.buymeacoffee.com/YOUR_BUYMEACOFFEE_USERNAME";
-//   return (
-//     <div className="fixed inset-0 bg-gradient-to-br from-purple-800 to-indigo-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
-//       <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md relative transform transition-all duration-300 scale-100 opacity-100 text-center">
-//         <button
-//           onClick={onClose}
-//           className="absolute top-3 right-3 text-gray-500 hover:text-gray-800 text-2xl font-bold focus:outline-none"
-//           aria-label="Close Buy Me a Coffee modal"
-//         >
-//           &times;
-//         </button>
-//         <h2 className="text-3xl font-bold text-purple-700 mb-4">Support This Project! ☕</h2>
-//         <p className="text-gray-700 text-base mb-6">
-//           Enjoying the Roblox Game Recommender? Your support helps keep this website running and allows for future improvements!
-//         </p>
-//         <a
-//           href={buyMeACoffeeLink}
-//           target="_blank"
-//           rel="noopener noreferrer"
-//           className="inline-block bg-yellow-400 text-yellow-900 font-bold py-3 px-6 rounded-lg shadow-lg hover:bg-yellow-500 transition duration-300 ease-in-out text-xl transform hover:scale-105"
-//         >
-//           Buy Me a Coffee!
-//         </a>
-//         <p className="text-gray-500 text-sm mt-4">Thank you for your generosity!</p>
-//       </div>
-//     </div>
-//   );
-// };
 
 // FutureUpdatesModal Component
 const FutureUpdatesModal = ({ onClose }) => {
@@ -248,7 +211,7 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
   const [isLoading, setIsLoading] = useState(false);
   // State for error messages
   const [errorMessage, setErrorMessage] = useState('');
-  // State to store the recommended games
+  // State to store the recommended games (only the currently displayed ones)
   const [recommendations, setRecommendations] = useState([]);
   // State to store the random game recommendation
   const [randomGameRecommendation, setRandomGameRecommendation] = useState(null);
@@ -256,10 +219,14 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
   const [searchTerm, setSearchTerm] = useState('');
   // State to control help modal visibility
   const [showHelpModal, setShowHelpModal] = useState(false);
-  // Removed state for Buy Me a Coffee modal visibility
-  // const [showBuyMeACoffeeModal, setShowBuyMeACoffeeModal] = useState(false);
   // State to control Future Updates modal visibility
   const [showFutureUpdatesModal, setShowFutureUpdatesModal] = useState(false);
+
+  // NEW: State to store the full list of scored and sorted games
+  const [allSortedRecommendations, setAllSortedRecommendations] = useState([]);
+  // NEW: State to track the current page for smart recommendations
+  const [currentPage, setCurrentPage] = useState(1);
+  const GAMES_PER_PAGE = 5; // How many games to show per page
 
 
   // Function to extract unique tags (genres or play styles) from the game data
@@ -285,6 +252,8 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
     setErrorMessage('');
     setRecommendations([]);
     setRandomGameRecommendation(null); // Clear random game when generating specific recs
+    setAllSortedRecommendations([]); // Clear previous full list
+    setCurrentPage(1); // Reset to first page
 
     // Simulate API call delay for recommendation generation
     await new Promise(resolve => setTimeout(resolve, 1500));
@@ -349,12 +318,14 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
       });
 
       const sortedGames = scoredGames.sort((a, b) => b.score - a.score);
-      const topRecommendations = sortedGames.filter(game => game.score > 0).slice(0, 5);
+      const filteredSortedGames = sortedGames.filter(game => game.score > 0); // All relevant games
 
-      if (topRecommendations.length === 0) {
+      setAllSortedRecommendations(filteredSortedGames); // Store the full list
+      setRecommendations(filteredSortedGames.slice(0, GAMES_PER_PAGE)); // Display initial page
+      setCurrentPage(1); // Set current page to 1
+
+      if (filteredSortedGames.length === 0) {
         setErrorMessage("No games found matching your preferences or search term. Try different selections!");
-      } else {
-        setRecommendations(topRecommendations);
       }
     } catch (error) {
       console.error('Error generating recommendations:', error);
@@ -364,12 +335,42 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
     }
   };
 
+  // NEW: Pagination functions
+  const goToNextPage = () => {
+    setIsLoading(true);
+    setErrorMessage('');
+    setRandomGameRecommendation(null); // Clear random game
+    setTimeout(() => { // Simulate loading for transition
+      const nextPage = currentPage + 1;
+      const startIndex = (nextPage - 1) * GAMES_PER_PAGE;
+      setRecommendations(allSortedRecommendations.slice(startIndex, startIndex + GAMES_PER_PAGE));
+      setCurrentPage(nextPage);
+      setIsLoading(false);
+    }, 500); // Half second delay for fade
+  };
+
+  const goToPreviousPage = () => {
+    setIsLoading(true);
+    setErrorMessage('');
+    setRandomGameRecommendation(null); // Clear random game
+    setTimeout(() => { // Simulate loading for transition
+      const prevPage = currentPage - 1;
+      const startIndex = (prevPage - 1) * GAMES_PER_PAGE;
+      setRecommendations(allSortedRecommendations.slice(startIndex, startIndex + GAMES_PER_PAGE));
+      setCurrentPage(prevPage);
+      setIsLoading(false);
+    }, 500); // Half second delay for fade
+  };
+
+
   // Function to get a random game recommendation
   const generateRandomRecommendation = async () => {
     setIsLoading(true);
     setErrorMessage('');
     setRecommendations([]); // Clear specific recommendations
     setRandomGameRecommendation(null); // Clear previous random game
+    setAllSortedRecommendations([]); // Clear full sorted list
+    setCurrentPage(1); // Reset page
 
     await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate delay
 
@@ -406,15 +407,13 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
     setErrorMessage('');
     setRecommendations([]);
     setRandomGameRecommendation(null);
+    setAllSortedRecommendations([]); // Clear full sorted list
+    setCurrentPage(1); // Reset page
   };
 
   // Functions to open and close the help modal
   const openHelpModal = () => setShowHelpModal(true);
   const closeHelpModal = () => setShowHelpModal(false);
-
-  // Removed functions to open and close the Buy Me a Coffee modal
-  // const openBuyMeACoffeeModal = () => setShowBuyMeACoffeeModal(true);
-  // const closeBuyMeACoffeeModal = () => setShowBuyMeACoffeeModal(false);
 
   // Functions to open and close the Future Updates modal
   const openFutureUpdatesModal = () => setShowFutureUpdatesModal(true);
@@ -433,6 +432,10 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
     );
   }
 
+  // Calculate total pages for smart recommendations
+  const totalPages = Math.ceil(allSortedRecommendations.length / GAMES_PER_PAGE);
+
+
   // Render the main UI
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-600 to-indigo-800 flex items-center justify-center p-4 font-sans antialiased">
@@ -450,7 +453,7 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
         </p>
 
         {/* How to Use Button */}
-        <div className="text-center mb-4"> {/* Adjusted margin-bottom */}
+        <div className="text-center mb-4">
           <button
             onClick={openHelpModal}
             className="text-purple-600 hover:text-purple-800 text-base font-medium focus:outline-none transition duration-200 ease-in-out cursor-pointer"
@@ -458,16 +461,6 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
             How to Use This Website?
           </button>
         </div>
-
-        {/* Removed Support Us Button */}
-        {/* <div className="text-center mb-4">
-          <button
-            onClick={openBuyMeACoffeeModal}
-            className="text-yellow-600 hover:text-yellow-800 text-base font-medium focus:outline-none transition duration-200 ease-in-out cursor-pointer"
-          >
-            Support Us! ☕
-          </button>
-        </div> */}
 
         {/* Future Updates Button */}
         <div className="text-center mb-8">
@@ -585,12 +578,9 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
               Your Random Pick:
             </h2>
             <div className="space-y-4">
-              <a
+              <div // Changed from <a> to <div>
                 key={randomGameRecommendation.id}
-                href={randomGameRecommendation.link || "#"}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block bg-purple-50 p-5 rounded-lg shadow-md border border-purple-200 hover:border-purple-400 transition duration-200 ease-in-out transform hover:-translate-y-1 cursor-pointer"
+                className="block bg-purple-50 p-5 rounded-lg shadow-md border border-purple-200 hover:border-purple-400 transition duration-200 ease-in-out transform hover:-translate-y-1" // Removed cursor-pointer
               >
                 <h3 className="text-xl font-semibold text-purple-700 mb-1">{randomGameRecommendation.name}</h3>
                 <p className="text-gray-700 text-sm">
@@ -609,12 +599,12 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
                     href={randomGameRecommendation.link}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-3 inline-block bg-blue-500 text-white font-bold py-2 px-4 rounded-lg shadow hover:bg-blue-600 transition duration-200 ease-in-out text-sm"
+                    className="mt-3 inline-block bg-blue-500 text-white font-bold py-2 px-4 rounded-lg shadow hover:bg-blue-600 transition duration-200 ease-in-out text-sm cursor-pointer"
                   >
                     Play on Roblox
                   </a>
                 )}
-              </a>
+              </div>
             </div>
           </div>
         )}
@@ -627,12 +617,9 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
             </h2>
             <div className="space-y-4">
               {recommendations.map((game) => (
-                <a
+                <div // Changed from <a> to <div>
                   key={game.id}
-                  href={game.link || "#"}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block bg-purple-50 p-5 rounded-lg shadow-md border border-purple-200 hover:border-purple-400 transition duration-200 ease-in-out transform hover:-translate-y-1 cursor-pointer"
+                  className="block bg-purple-50 p-5 rounded-lg shadow-md border border-purple-200 hover:border-purple-400 transition duration-200 ease-in-out transform hover:-translate-y-1" // Removed cursor-pointer
                 >
                   <h3 className="text-xl font-semibold text-purple-700 mb-1">{game.name}</h3>
                   <p className="text-gray-700 text-sm">
@@ -651,20 +638,46 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
                       href={game.link}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="mt-3 inline-block bg-blue-500 text-white font-bold py-2 px-4 rounded-lg shadow hover:bg-blue-600 transition duration-200 ease-in-out text-sm"
+                      className="mt-3 inline-block bg-blue-500 text-white font-bold py-2 px-4 rounded-lg shadow hover:bg-blue-600 transition duration-200 ease-in-out text-sm cursor-pointer"
                     >
                       Play on Roblox
                     </a>
                   )}
-                </a>
+                </div>
               ))}
             </div>
+            {/* Pagination Controls */}
+            {allSortedRecommendations.length > GAMES_PER_PAGE && (
+              <div className="flex justify-center items-center gap-4 mt-6">
+                <button
+                  onClick={goToPreviousPage}
+                  disabled={isLoading || currentPage === 1}
+                  className={`bg-purple-500 text-white font-bold py-2 px-4 rounded-lg shadow hover:bg-purple-600 transition duration-200 ease-in-out text-base transform hover:scale-105 ${isLoading || currentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                </button>
+                <span className="text-gray-700 text-base font-medium">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={goToNextPage}
+                  disabled={isLoading || currentPage === totalPages}
+                  className={`bg-purple-500 text-white font-bold py-2 px-4 rounded-lg shadow hover:bg-purple-600 transition duration-200 ease-in-out text-base transform hover:scale-105 ${isLoading || currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
 
       {showHelpModal && <HelpModal onClose={closeHelpModal} />}
-      {showFutureUpdatesModal && <FutureUpdatesModal onClose={closeFutureUpdatesModal} />} {/* NEW: Render FutureUpdatesModal */}
+      {showFutureUpdatesModal && <FutureUpdatesModal onClose={closeFutureUpdatesModal} />}
     </div>
   );
 }
