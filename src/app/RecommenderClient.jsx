@@ -3,6 +3,24 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 
+// Fisher-Yates (Knuth) shuffle algorithm
+const shuffleArray = (array) => {
+  let currentIndex = array.length, randomIndex;
+
+  // While there remain elements to shuffle.
+  while (currentIndex !== 0) {
+    // Pick a remaining element.
+    randomIndex = Math.floor(Math.random() * currentIndex);
+    currentIndex--;
+
+    // And swap it with the current element.
+    [array[currentIndex], array[randomIndex]] = [
+      array[randomIndex], array[currentIndex]
+    ];
+  }
+  return array;
+};
+
 // MultiSelectDropdown Component
 const MultiSelectDropdown = ({ options, selectedOptions, onSelect, limit, label }) => {
   const [isOpen, setIsOpen] = useState(false); // State to control dropdown visibility
@@ -320,11 +338,14 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
       const sortedGames = scoredGames.sort((a, b) => b.score - a.score);
       const filteredSortedGames = sortedGames.filter(game => game.score > 0); // All relevant games
 
-      setAllSortedRecommendations(filteredSortedGames); // Store the full list
-      setRecommendations(filteredSortedGames.slice(0, GAMES_PER_PAGE)); // Display initial page
+      // --- APPLY SHUFFLE HERE ---
+      const shuffledFilteredSortedGames = shuffleArray([...filteredSortedGames]); // Create a shallow copy before shuffling
+
+      setAllSortedRecommendations(shuffledFilteredSortedGames); // Store the full shuffled list
+      setRecommendations(shuffledFilteredSortedGames.slice(0, GAMES_PER_PAGE)); // Display initial page
       setCurrentPage(1); // Set current page to 1
 
-      if (filteredSortedGames.length === 0) {
+      if (shuffledFilteredSortedGames.length === 0) {
         setErrorMessage("No games found matching your preferences or search term. Try different selections!");
       }
     } catch (error) {
@@ -377,12 +398,15 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
     try {
       // Filter games by search term before picking random
       const lowerSearchTerm = searchTerm.toLowerCase().trim();
-      const gamesToPickFrom = gamesData.filter(game =>
+      let gamesToPickFrom = gamesData.filter(game =>
         game.name.toLowerCase().includes(lowerSearchTerm) ||
         game.genre.toLowerCase().includes(lowerSearchTerm) ||
         game.playStyle.toLowerCase().includes(lowerSearchTerm) ||
         (game.theme && game.theme.toLowerCase().includes(lowerSearchTerm))
       );
+
+      // --- SHUFFLE FOR RANDOM PICK TOO (Optional, but good for true randomness) ---
+      gamesToPickFrom = shuffleArray([...gamesToPickFrom]); // Shuffle the filtered list for random pick
 
       if (gamesToPickFrom.length === 0) {
         setErrorMessage("No games found matching your search term to pick a random game.");
