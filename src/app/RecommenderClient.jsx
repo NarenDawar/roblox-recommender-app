@@ -273,9 +273,6 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
     setAllSortedRecommendations([]); // Clear previous full list
     setCurrentPage(1); // Reset to first page
 
-    // Simulate API call delay for recommendation generation
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
     try {
       // Adjusted validation: require at least one genre or play style selected, or a search term
       if (selectedGenres.length === 0 && selectedPlayStyles.length === 0 && !searchTerm.trim()) {
