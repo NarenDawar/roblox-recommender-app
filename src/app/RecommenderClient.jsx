@@ -442,7 +442,7 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
       <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl transform transition-all duration-300 hover:scale-[1.01]">
         <h1 className="text-4xl font-extrabold text-center text-gray-900 mb-6 tracking-tight">
           <span className="bg-clip-text text-transparent bg-gradient-to-r from-pink-500 to-red-500">
-            Roblox Game Recommender
+            RBXDiscover: A Roblox Game Recommender
           </span> 🎮
         </h1>
 
