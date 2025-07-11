@@ -1,4 +1,3 @@
-// app/page.jsx
 // This is now a Server Component, so no 'use client' at the top of THIS file.
 // Data fetching happens directly here.
 
@@ -37,6 +36,11 @@ const dbAdmin = getAdminFirestore();
 
 // Home is now an async Server Component
 export default async function Home() {
+  // Set revalidate time (e.g., 60 seconds)
+  // This tells Next.js to revalidate the page data at most once every 60 seconds.
+  // The value is in seconds.
+  const revalidate = 60; // Adjust as needed. For testing, you can make it shorter.
+
   let gamesData = [];
   let gamesLoadError = null;
 
@@ -68,3 +72,6 @@ export default async function Home() {
     <RecommenderClient gamesData={gamesData} />
   );
 }
+
+// THIS IS THE IMPORTANT ADDITION FOR REVALIDATION
+export const revalidate = 60; // Revalidate at most every 60 seconds
