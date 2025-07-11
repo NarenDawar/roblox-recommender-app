@@ -1,19 +1,15 @@
 // app/RecommenderClient.jsx
-'use client' // This directive is crucial for a Client Component
+'use client'
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react'; // Added useCallback
+import debounce from 'lodash/debounce'; // You'll need to install lodash: npm install lodash or yarn add lodash
 
-// Fisher-Yates (Knuth) shuffle algorithm
+// Fisher-Yates (Knuth) shuffle algorithm (Keep this as is)
 const shuffleArray = (array) => {
   let currentIndex = array.length, randomIndex;
-
-  // While there remain elements to shuffle.
   while (currentIndex !== 0) {
-    // Pick a remaining element.
     randomIndex = Math.floor(Math.random() * currentIndex);
     currentIndex--;
-
-    // And swap it with the current element.
     [array[currentIndex], array[randomIndex]] = [
       array[randomIndex], array[currentIndex]
     ];
@@ -21,13 +17,12 @@ const shuffleArray = (array) => {
   return array;
 };
 
-// MultiSelectDropdown Component
+// MultiSelectDropdown Component (Keep this as is)
 const MultiSelectDropdown = ({ options, selectedOptions, onSelect, limit, label }) => {
-  const [isOpen, setIsOpen] = useState(false); // State to control dropdown visibility
-  const [searchTerm, setSearchTerm] = useState(''); // State for filtering options
-  const dropdownRef = useRef(null); // Ref to detect clicks outside the dropdown
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const dropdownRef = useRef(null);
 
-  // Effect to close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -40,16 +35,13 @@ const MultiSelectDropdown = ({ options, selectedOptions, onSelect, limit, label 
     };
   }, []);
 
-  // Filter options based on search term
   const filteredOptions = options.filter(option =>
     option.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Handle option selection/deselection
   const handleOptionClick = (option) => {
     const isSelected = selectedOptions.includes(option);
     let newSelection;
-
     if (isSelected) {
       newSelection = selectedOptions.filter(item => item !== option);
     } else {
@@ -135,7 +127,7 @@ const MultiSelectDropdown = ({ options, selectedOptions, onSelect, limit, label 
   );
 };
 
-// HelpModal Component
+// HelpModal Component (Keep this as is)
 const HelpModal = ({ onClose }) => {
   return (
     <div className="fixed inset-0 bg-gradient-to-br from-purple-800 to-indigo-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
@@ -184,7 +176,7 @@ const HelpModal = ({ onClose }) => {
   );
 };
 
-// FutureUpdatesModal Component
+// FutureUpdatesModal Component (Keep this as is)
 const FutureUpdatesModal = ({ onClose }) => {
   return (
     <div className="fixed inset-0 bg-gradient-to-br from-purple-800 to-indigo-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
@@ -221,37 +213,31 @@ const FutureUpdatesModal = ({ onClose }) => {
 
 
 // RecommenderClient is now a Client Component
-export default function RecommenderClient({ gamesData, gamesLoadError }) { // Accept gamesLoadError prop
-  // State to store selected genres and play styles
+export default function RecommenderClient({ gamesData, gamesLoadError }) {
   const [selectedGenres, setSelectedGenres] = useState([]);
   const [selectedPlayStyles, setSelectedPlayStyles] = useState([]);
-  // State for loading indicator for recommendations
   const [isLoading, setIsLoading] = useState(false);
-  // State for error messages
   const [errorMessage, setErrorMessage] = useState('');
-  // State to store the recommended games (only the currently displayed ones)
   const [recommendations, setRecommendations] = useState([]);
-  // State to store the random game recommendation
   const [randomGameRecommendation, setRandomGameRecommendation] = useState(null);
-  // State for search term
   const [searchTerm, setSearchTerm] = useState('');
-  // State to control help modal visibility
+
+  // NEW: State for autocomplete suggestions
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false); // To control visibility of the dropdown
+  const searchInputRef = useRef(null); // Ref for click outside detection
+
   const [showHelpModal, setShowHelpModal] = useState(false);
-  // State to control Future Updates modal visibility
   const [showFutureUpdatesModal, setShowFutureUpdatesModal] = useState(false);
 
-  // NEW: State to store the full list of scored and sorted games
   const [allSortedRecommendations, setAllSortedRecommendations] = useState([]);
-  // NEW: State to track the current page for smart recommendations
   const [currentPage, setCurrentPage] = useState(1);
-  const GAMES_PER_PAGE = 5; // How many games to show per page
+  const GAMES_PER_PAGE = 5;
 
-
-  // Function to extract unique tags (genres or play styles) from the game data
+  // Function to extract unique tags (genres or play styles) from the game data (Keep as is)
   const extractUniqueTags = (games, type) => {
     const tags = new Set();
     games.forEach(game => {
-      // Ensure game[type] is a string before splitting
       if (typeof game[type] === 'string') {
         const gameTags = game[type].split(',').map(tag => tag.trim());
         gameTags.forEach(tag => tags.add(tag));
@@ -260,28 +246,85 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
     return Array.from(tags).sort();
   };
 
-  // Dynamically get all unique genres and play styles from the fetched game data
   const allAvailableGenres = extractUniqueTags(gamesData, 'genre');
   const allAvailablePlayStyles = extractUniqueTags(gamesData, 'playStyle');
 
-  // Function to generate recommendations based on user input
+  // --- NEW: Debounced function to get suggestions ---
+  // useCallback is used to memoize the debounced function, preventing it from being
+  // recreated on every render, which can cause issues with debounce.
+  const getSuggestions = useCallback(
+    debounce((value) => {
+      if (!value.trim()) {
+        setSuggestions([]);
+        return;
+      }
+      const lowerValue = value.toLowerCase().trim();
+      const filtered = gamesData.filter(game =>
+        game.name.toLowerCase().includes(lowerValue) ||
+        (game.genre && game.genre.toLowerCase().includes(lowerValue)) ||
+        (game.playStyle && game.playStyle.toLowerCase().includes(lowerValue)) ||
+        (game.theme && game.theme.toLowerCase().includes(lowerValue))
+      );
+
+      // Get unique names from the filtered games, limit to say, 10-15 suggestions
+      const uniqueNames = Array.from(new Set(filtered.map(game => game.name))).slice(0, 15);
+      setSuggestions(uniqueNames);
+      setShowSuggestions(uniqueNames.length > 0); // Only show if there are suggestions
+    }, 300), // Debounce for 300ms
+    [gamesData] // Dependency array: recreate if gamesData changes
+  );
+
+  // --- MODIFIED: Search input onChange handler ---
+  const handleSearchInputChange = (e) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    getSuggestions(value); // Call the debounced suggestion function
+  };
+
+  // --- NEW: Handle click on a suggestion ---
+  const handleSuggestionClick = (suggestion) => {
+    setSearchTerm(suggestion); // Set the input to the selected suggestion
+    setSuggestions([]); // Clear suggestions
+    setShowSuggestions(false); // Hide the dropdown
+    // Optionally trigger recommendations immediately after selecting
+    // generateRecommendations(); // You might want to call this here or let the user click the button
+  };
+
+  // --- NEW: Close suggestions when clicking outside the search input area ---
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (searchInputRef.current && !searchInputRef.current.contains(event.target)) {
+        setShowSuggestions(false);
+        setSuggestions([]); // Clear them fully when clicked away
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+
+  // Function to generate recommendations based on user input (Keep as is, no change needed here directly)
   const generateRecommendations = async () => {
     setIsLoading(true);
     setErrorMessage('');
     setRecommendations([]);
-    setRandomGameRecommendation(null); // Clear random game when generating specific recs
-    setAllSortedRecommendations([]); // Clear previous full list
-    setCurrentPage(1); // Reset to first page
+    setRandomGameRecommendation(null);
+    setAllSortedRecommendations([]);
+    setCurrentPage(1);
+    setShowSuggestions(false); // Hide suggestions when generating recommendations
+
+    // Simulate API call delay for recommendation generation
+    await new Promise(resolve => setTimeout(resolve, 1500));
 
     try {
-      // Adjusted validation: require at least one genre or play style selected, or a search term
       if (selectedGenres.length === 0 && selectedPlayStyles.length === 0 && !searchTerm.trim()) {
         setErrorMessage("Please select at least one preferred genre or play style, or enter a search term to get recommendations.");
         setIsLoading(false);
         return;
       }
 
-      // Filter games by search term first
       const lowerSearchTerm = searchTerm.toLowerCase().trim();
       const searchedGames = gamesData.filter(game =>
         game.name.toLowerCase().includes(lowerSearchTerm) ||
@@ -296,7 +339,6 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
         const gamePlayStyles = typeof game.playStyle === 'string' ? game.playStyle.toLowerCase().split(',').map(s => s.trim()) : [];
         const gameThemes = typeof game.theme === 'string' ? game.theme.toLowerCase().split(',').map(t => t.trim()) : [];
 
-        // Score based on genre matches
         selectedGenres.forEach(selectedGenre => {
           const lowerSelectedGenre = selectedGenre.toLowerCase();
           if (gameGenres.some(g => g.includes(lowerSelectedGenre))) {
@@ -304,7 +346,6 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
           }
         });
 
-        // Score based on play style matches
         selectedPlayStyles.forEach(selectedPlayStyle => {
           const lowerSelectedPlayStyle = selectedPlayStyle.toLowerCase();
           if (gamePlayStyles.some(s => s.includes(lowerSelectedPlayStyle))) {
@@ -312,35 +353,28 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
           }
         });
 
-        // Add score for theme matches (if theme filter was present, or for general relevance)
-        // This part of scoring is now more general, as theme filter is removed from UI.
-        // If the game's theme contains the search term, add a bonus.
         if (game.theme && lowerSearchTerm && game.theme.toLowerCase().includes(lowerSearchTerm)) {
-             score += 5; // Small bonus if search term matches theme
+             score += 5;
         }
 
-        // Ensure a game that was found by the initial `searchedGames` filter
-        // or by any dropdown filter gets at least a score of 1 to be included in recommendations.
-        // This is crucial for search-only results.
         if (score > 0 || (lowerSearchTerm && (game.name.toLowerCase().includes(lowerSearchTerm) ||
                                               game.genre.toLowerCase().includes(lowerSearchTerm) ||
                                               game.playStyle.toLowerCase().includes(lowerSearchTerm) ||
                                               (game.theme && game.theme.toLowerCase().includes(lowerSearchTerm))))) {
-            score = Math.max(score, 1); // Ensure minimum score of 1 if any criteria met
+            score = Math.max(score, 1);
         }
 
         return { ...game, score };
       });
 
       const sortedGames = scoredGames.sort((a, b) => b.score - a.score);
-      const filteredSortedGames = sortedGames.filter(game => game.score > 0); // All relevant games
+      const filteredSortedGames = sortedGames.filter(game => game.score > 0);
 
-      // --- APPLY SHUFFLE HERE ---
-      const shuffledFilteredSortedGames = shuffleArray([...filteredSortedGames]); // Create a shallow copy before shuffling
+      const shuffledFilteredSortedGames = shuffleArray([...filteredSortedGames]);
 
-      setAllSortedRecommendations(shuffledFilteredSortedGames); // Store the full shuffled list
-      setRecommendations(shuffledFilteredSortedGames.slice(0, GAMES_PER_PAGE)); // Display initial page
-      setCurrentPage(1); // Set current page to 1
+      setAllSortedRecommendations(shuffledFilteredSortedGames);
+      setRecommendations(shuffledFilteredSortedGames.slice(0, GAMES_PER_PAGE));
+      setCurrentPage(1);
 
       if (shuffledFilteredSortedGames.length === 0) {
         setErrorMessage("No games found matching your preferences or search term. Try different selections!");
@@ -353,47 +387,46 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
     }
   };
 
-  // NEW: Pagination functions
+  // Pagination functions (Keep as is)
   const goToNextPage = () => {
     setIsLoading(true);
     setErrorMessage('');
-    setRandomGameRecommendation(null); // Clear random game
-    setTimeout(() => { // Simulate loading for transition
+    setRandomGameRecommendation(null);
+    setTimeout(() => {
       const nextPage = currentPage + 1;
       const startIndex = (nextPage - 1) * GAMES_PER_PAGE;
       setRecommendations(allSortedRecommendations.slice(startIndex, startIndex + GAMES_PER_PAGE));
       setCurrentPage(nextPage);
       setIsLoading(false);
-    }, 500); // Half second delay for fade
+    }, 500);
   };
 
   const goToPreviousPage = () => {
     setIsLoading(true);
     setErrorMessage('');
-    setRandomGameRecommendation(null); // Clear random game
-    setTimeout(() => { // Simulate loading for transition
+    setRandomGameRecommendation(null);
+    setTimeout(() => {
       const prevPage = currentPage - 1;
       const startIndex = (prevPage - 1) * GAMES_PER_PAGE;
       setRecommendations(allSortedRecommendations.slice(startIndex, startIndex + GAMES_PER_PAGE));
       setCurrentPage(prevPage);
       setIsLoading(false);
-    }, 500); // Half second delay for fade
+    }, 500);
   };
 
-
-  // Function to get a random game recommendation
+  // Function to get a random game recommendation (Keep as is)
   const generateRandomRecommendation = async () => {
     setIsLoading(true);
     setErrorMessage('');
-    setRecommendations([]); // Clear specific recommendations
-    setRandomGameRecommendation(null); // Clear previous random game
-    setAllSortedRecommendations([]); // Clear full sorted list
-    setCurrentPage(1); // Reset page
+    setRecommendations([]);
+    setRandomGameRecommendation(null);
+    setAllSortedRecommendations([]);
+    setCurrentPage(1);
+    setShowSuggestions(false); // Hide suggestions
 
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     try {
-      // Filter games by search term before picking random
       const lowerSearchTerm = searchTerm.toLowerCase().trim();
       let gamesToPickFrom = gamesData.filter(game =>
         game.name.toLowerCase().includes(lowerSearchTerm) ||
@@ -402,8 +435,7 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
         (game.theme && game.theme.toLowerCase().includes(lowerSearchTerm))
       );
 
-      // --- SHUFFLE FOR RANDOM PICK TOO (Optional, but good for true randomness) ---
-      gamesToPickFrom = shuffleArray([...gamesToPickFrom]); // Shuffle the filtered list for random pick
+      gamesToPickFrom = shuffleArray([...gamesToPickFrom]);
 
       if (gamesToPickFrom.length === 0) {
         setErrorMessage("No games found matching your search term to pick a random game.");
@@ -420,28 +452,29 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
     }
   };
 
-  // Function to clear all selected filters and search term
+  // Function to clear all selected filters and search term (Keep as is)
   const clearAllFilters = () => {
     setSelectedGenres([]);
     setSelectedPlayStyles([]);
-    setSearchTerm(''); // Clear search term
+    setSearchTerm('');
     setErrorMessage('');
     setRecommendations([]);
     setRandomGameRecommendation(null);
-    setAllSortedRecommendations([]); // Clear full sorted list
-    setCurrentPage(1); // Reset page
+    setAllSortedRecommendations([]);
+    setCurrentPage(1);
+    setSuggestions([]); // Clear suggestions
+    setShowSuggestions(false); // Hide suggestions
   };
 
-  // Functions to open and close the help modal
+  // Functions to open and close the help modal (Keep as is)
   const openHelpModal = () => setShowHelpModal(true);
   const closeHelpModal = () => setShowHelpModal(false);
 
-  // Functions to open and close the Future Updates modal
+  // Functions to open and close the Future Updates modal (Keep as is)
   const openFutureUpdatesModal = () => setShowFutureUpdatesModal(true);
   const closeFutureUpdatesModal = () => setShowFutureUpdatesModal(false);
 
-
-  // Render error state if games data failed to load in the Server Component
+  // Render error state if games data failed to load in the Server Component (Keep as is)
   if (gamesLoadError) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-600 to-indigo-800 flex items-center justify-center p-4 font-sans antialiased">
@@ -453,11 +486,8 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
     );
   }
 
-  // Calculate total pages for smart recommendations
   const totalPages = Math.ceil(allSortedRecommendations.length / GAMES_PER_PAGE);
 
-
-  // Render the main UI
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-600 to-indigo-800 flex items-center justify-center p-4 font-sans antialiased">
       <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl transform transition-all duration-300 hover:scale-[1.01]">
@@ -469,11 +499,10 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
 
         <p className="text-center text-gray-600 mb-4 text-lg">
           Discover your next favorite Roblox game! Select your preferences below or search directly.
-          <br className="hidden sm:inline" /> {/* Line break for smaller screens */}
+          <br className="hidden sm:inline" />
           <span className="text-sm text-gray-500">Database updated weekly, last updated July 6th.</span>
         </p>
 
-        {/* How to Use Button */}
         <div className="text-center mb-4">
           <button
             onClick={openHelpModal}
@@ -483,7 +512,6 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
           </button>
         </div>
 
-        {/* Future Updates Button */}
         <div className="text-center mb-8">
           <button
             onClick={openFutureUpdatesModal}
@@ -494,8 +522,8 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
         </div>
 
 
-        {/* Search Bar */}
-        <div className="mb-6">
+        {/* Search Bar with Autocomplete */}
+        <div className="mb-6 relative" ref={searchInputRef}> {/* Added relative and ref */}
           <label htmlFor="gameSearch" className="block text-gray-700 text-lg font-semibold mb-2">
             Search for a game by name, genre, or style:
           </label>
@@ -505,9 +533,33 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
             className="w-full px-4 py-3 rounded-lg border-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-800 text-base transition duration-200 ease-in-out"
             placeholder="e.g., Adopt Me, horror, PvP"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={handleSearchInputChange} // Changed to new handler
+            onFocus={() => { // Show suggestions when input is focused and there's a search term
+                if (searchTerm.trim() && suggestions.length > 0) {
+                    setShowSuggestions(true);
+                } else if (searchTerm.trim() && !suggestions.length) {
+                    // If no suggestions were found yet, try to generate them when refocusing
+                    getSuggestions(searchTerm);
+                }
+            }}
             aria-label="Search for games"
+            autoComplete="off" // Prevent browser's native autocomplete
           />
+
+          {/* Autocomplete Suggestions Dropdown */}
+          {showSuggestions && suggestions.length > 0 && searchTerm.trim() && (
+            <ul className="absolute z-20 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+              {suggestions.map((suggestion) => (
+                <li
+                  key={suggestion}
+                  className="px-4 py-2 cursor-pointer hover:bg-gray-100 text-gray-900"
+                  onClick={() => handleSuggestionClick(suggestion)}
+                >
+                  {suggestion}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
 
@@ -534,7 +586,6 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
         <div className="flex flex-col sm:flex-row gap-4 mb-8">
           <button
             onClick={generateRecommendations}
-            // Adjusted disabled condition to include search term
             disabled={isLoading || (selectedGenres.length === 0 && selectedPlayStyles.length === 0 && !searchTerm.trim())}
             className={`flex-1 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg hover:from-blue-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition duration-300 ease-in-out text-xl transform hover:scale-105 ${isLoading || (selectedGenres.length === 0 && selectedPlayStyles.length === 0 && !searchTerm.trim()) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
             aria-live="polite"
@@ -552,7 +603,6 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
             )}
           </button>
 
-          {/* Get a Random Game Button */}
           <button
             onClick={generateRandomRecommendation}
             disabled={isLoading || gamesData.length === 0}
@@ -573,7 +623,6 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
           </button>
         </div>
 
-        {/* Clear All Filters Button */}
         {(selectedGenres.length > 0 || selectedPlayStyles.length > 0 || searchTerm.trim() || recommendations.length > 0 || randomGameRecommendation) && (
           <div className="text-center mt-4">
             <button
@@ -585,23 +634,21 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
           </div>
         )}
 
-
         {errorMessage && (
           <div className="mt-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg text-center text-base" role="alert">
             {errorMessage}
           </div>
         )}
 
-        {/* Display Random Game Recommendation */}
         {randomGameRecommendation && (
           <div className="mt-8">
             <h2 className="text-3xl font-bold text-gray-900 mb-5 text-center">
               Your Random Pick:
             </h2>
             <div className="space-y-4">
-              <div // Changed from <a> to <div>
+              <div
                 key={randomGameRecommendation.id}
-                className="block bg-purple-50 p-5 rounded-lg shadow-md border border-purple-200 hover:border-purple-400 transition duration-200 ease-in-out transform hover:-translate-y-1" // Removed cursor-pointer
+                className="block bg-purple-50 p-5 rounded-lg shadow-md border border-purple-200 hover:border-purple-400 transition duration-200 ease-in-out transform hover:-translate-y-1"
               >
                 <h3 className="text-xl font-semibold text-purple-700 mb-1">{randomGameRecommendation.name}</h3>
                 <p className="text-gray-700 text-sm">
@@ -630,7 +677,6 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
           </div>
         )}
 
-        {/* Display Smart Recommendations */}
         {recommendations.length > 0 && (
           <div className="mt-8">
             <h2 className="text-3xl font-bold text-gray-900 mb-5 text-center">
@@ -638,9 +684,9 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
             </h2>
             <div className="space-y-4">
               {recommendations.map((game) => (
-                <div // Changed from <a> to <div>
+                <div
                   key={game.id}
-                  className="block bg-purple-50 p-5 rounded-lg shadow-md border border-purple-200 hover:border-purple-400 transition duration-200 ease-in-out transform hover:-translate-y-1" // Removed cursor-pointer
+                  className="block bg-purple-50 p-5 rounded-lg shadow-md border border-purple-200 hover:border-purple-400 transition duration-200 ease-in-out transform hover:-translate-y-1"
                 >
                   <h3 className="text-xl font-semibold text-purple-700 mb-1">{game.name}</h3>
                   <p className="text-gray-700 text-sm">
@@ -667,7 +713,6 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) { // Ac
                 </div>
               ))}
             </div>
-            {/* Pagination Controls */}
             {allSortedRecommendations.length > GAMES_PER_PAGE && (
               <div className="flex justify-center items-center gap-4 mt-6">
                 <button
