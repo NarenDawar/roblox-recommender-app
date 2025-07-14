@@ -1,8 +1,20 @@
 // app/RecommenderClient.jsx
 'use client'
 
-import React, { useState, useEffect, useRef, useCallback } from 'react'; // Added useCallback
-import debounce from 'lodash/debounce'; // You'll need to install lodash: npm install lodash or yarn add lodash
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import debounce from 'lodash/debounce';
+
+// Firebase client imports for user state management and sign out
+import { auth, db } from '../lib/firebaseClient'; // Adjust path as needed
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+
+// Firestore imports for user data
+import { doc, getDoc, collection, addDoc, deleteDoc, getDocs, query, where } from 'firebase/firestore';
+
+// Import the new AuthModal component
+import AuthModal from '../components/AuthModal';
+// Import the new FavoritesPage component
+import FavoritesPage from '../components/FavoritesPage';
 
 // Fisher-Yates (Knuth) shuffle algorithm (Keep this as is)
 const shuffleArray = (array) => {
@@ -222,19 +234,148 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
   const [randomGameRecommendation, setRandomGameRecommendation] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // NEW: State for autocomplete suggestions
   const [suggestions, setSuggestions] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false); // To control visibility of the dropdown
-  const searchInputRef = useRef(null); // Ref for click outside detection
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const searchInputRef = useRef(null);
 
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [showFutureUpdatesModal, setShowFutureUpdatesModal] = useState(false);
+
+  // State for authentication
+  const [user, setUser] = useState(null); // Firebase user object
+  const [loadingAuth, setLoadingAuth] = useState(true); // To indicate initial auth check is ongoing
+  const [showAuthModal, setShowAuthModal] = useState(false); // To control auth modal visibility
+  const [authMode, setAuthMode] = useState('login'); // 'login' or 'signup'
+
+  // State for sidebar
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // NEW: State to manage current view ('home' or 'favorites')
+  const [currentPageView, setCurrentPageView] = useState('home');
+
+  // NEW: State to store favorited game IDs for the current user
+  const [favoritedGameIds, setFavoritedGameIds] = useState([]);
 
   const [allSortedRecommendations, setAllSortedRecommendations] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const GAMES_PER_PAGE = 5;
 
-  // Function to extract unique tags (genres or play styles) from the game data (Keep as is)
+  // Auth state listener
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setLoadingAuth(false);
+      // Fetch favorites when user auth state changes
+      if (currentUser) {
+        fetchFavoritedGameIds(currentUser.uid);
+      } else {
+        setFavoritedGameIds([]); // Clear favorites if logged out
+      }
+    });
+    return () => unsubscribe(); // Cleanup subscription
+  }, []);
+
+  // Effect to close sidebar when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // Check if click is outside the sidebar and the hamburger icon
+      const sidebar = document.getElementById('sidebar');
+      const hamburgerIcon = document.getElementById('hamburger-icon');
+      if (sidebar && !sidebar.contains(event.target) && hamburgerIcon && !hamburgerIcon.contains(event.target)) {
+        setIsSidebarOpen(false);
+      }
+    };
+
+    if (isSidebarOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    } else {
+      document.removeEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isSidebarOpen]);
+
+  // NEW: Function to fetch favorited game IDs from Firestore
+  const fetchFavoritedGameIds = async (userId) => {
+    if (!userId) {
+      setFavoritedGameIds([]);
+      return;
+    }
+    try {
+      // Ensure __app_id is defined before using it
+      const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+      const favoritesCollectionRef = collection(db, `artifacts/${appId}/users/${userId}/favorites`);
+      const q = query(favoritesCollectionRef);
+      const querySnapshot = await getDocs(q);
+      const ids = querySnapshot.docs.map(doc => doc.data().gameId);
+      setFavoritedGameIds(ids);
+    } catch (error) {
+      console.error("Error fetching favorite game IDs:", error);
+      setErrorMessage("Failed to load favorites.");
+    }
+  };
+
+  // NEW: Function to toggle a game's favorite status
+  const toggleFavorite = async (gameId) => {
+    if (!user) {
+      setErrorMessage("Please log in to favorite games.");
+      setShowAuthModal(true);
+      setAuthMode('login'); // Suggest login if not authenticated
+      return;
+    }
+
+    const userId = user.uid;
+    // Ensure __app_id is defined before using it
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+    const favoritesCollectionRef = collection(db, `artifacts/${appId}/users/${userId}/favorites`);
+    const isCurrentlyFavorited = favoritedGameIds.includes(gameId);
+
+    try {
+      if (isCurrentlyFavorited) {
+        // Remove from favorites
+        const q = query(favoritesCollectionRef, where("gameId", "==", gameId));
+        const querySnapshot = await getDocs(q);
+        querySnapshot.forEach(async (docToDelete) => {
+          await deleteDoc(docToDelete.ref);
+        });
+        setFavoritedGameIds(prevIds => prevIds.filter(id => id !== gameId));
+      } else {
+        // Add to favorites
+        await addDoc(favoritesCollectionRef, {
+          gameId: gameId,
+          favoritedAt: new Date(), // Store timestamp
+        });
+        setFavoritedGameIds(prevIds => [...prevIds, gameId]);
+      }
+      setErrorMessage(''); // Clear any previous errors
+
+      // --- NEW LOGIC TO UPDATE DISPLAYED RECOMMENDATIONS ---
+      // Update the isFavorite status for the game in the current recommendations list
+      setRecommendations(prevRecs =>
+        prevRecs.map(rec =>
+          rec.id === gameId ? { ...rec, isFavorite: !isCurrentlyFavorited } : rec
+        )
+      );
+
+      // Update the isFavorite status for the random game recommendation if it's the one being toggled
+      if (randomGameRecommendation && randomGameRecommendation.id === gameId) {
+        setRandomGameRecommendation(prevRandom => ({
+          ...prevRandom,
+          isFavorite: !isCurrentlyFavorited
+        }));
+      }
+      // --- END NEW LOGIC ---
+
+    } catch (error) {
+      console.error("Error toggling favorite status:", error);
+      setErrorMessage("Failed to update favorite status.");
+    }
+  };
+
+
+  // Function to extract unique tags (genres or play styles) from the game data (Keep this as is)
   const extractUniqueTags = (games, type) => {
     const tags = new Set();
     games.forEach(game => {
@@ -249,9 +390,6 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
   const allAvailableGenres = extractUniqueTags(gamesData, 'genre');
   const allAvailablePlayStyles = extractUniqueTags(gamesData, 'playStyle');
 
-  // --- NEW: Debounced function to get suggestions ---
-  // useCallback is used to memoize the debounced function, preventing it from being
-  // recreated on every render, which can cause issues with debounce.
   const getSuggestions = useCallback(
     debounce((value) => {
       if (!value.trim()) {
@@ -266,36 +404,30 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
         (game.theme && game.theme.toLowerCase().includes(lowerValue))
       );
 
-      // Get unique names from the filtered games, limit to say, 10-15 suggestions
       const uniqueNames = Array.from(new Set(filtered.map(game => game.name))).slice(0, 15);
       setSuggestions(uniqueNames);
-      setShowSuggestions(uniqueNames.length > 0); // Only show if there are suggestions
-    }, 300), // Debounce for 300ms
-    [gamesData] // Dependency array: recreate if gamesData changes
+      setShowSuggestions(uniqueNames.length > 0);
+    }, 300),
+    [gamesData]
   );
 
-  // --- MODIFIED: Search input onChange handler ---
   const handleSearchInputChange = (e) => {
     const value = e.target.value;
     setSearchTerm(value);
-    getSuggestions(value); // Call the debounced suggestion function
+    getSuggestions(value);
   };
 
-  // --- NEW: Handle click on a suggestion ---
   const handleSuggestionClick = (suggestion) => {
-    setSearchTerm(suggestion); // Set the input to the selected suggestion
-    setSuggestions([]); // Clear suggestions
-    setShowSuggestions(false); // Hide the dropdown
-    // Optionally trigger recommendations immediately after selecting
-    // generateRecommendations(); // You might want to call this here or let the user click the button
+    setSearchTerm(suggestion);
+    setSuggestions([]);
+    setShowSuggestions(false);
   };
 
-  // --- NEW: Close suggestions when clicking outside the search input area ---
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (searchInputRef.current && !searchInputRef.current.contains(event.target)) {
         setShowSuggestions(false);
-        setSuggestions([]); // Clear them fully when clicked away
+        setSuggestions([]);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -305,7 +437,7 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
   }, []);
 
 
-  // Function to generate recommendations based on user input (Keep as is, no change needed here directly)
+  // Function to generate recommendations based on user input (Keep this as is, no change needed here directly)
   const generateRecommendations = async () => {
     setIsLoading(true);
     setErrorMessage('');
@@ -313,9 +445,8 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
     setRandomGameRecommendation(null);
     setAllSortedRecommendations([]);
     setCurrentPage(1);
-    setShowSuggestions(false); // Hide suggestions when generating recommendations
+    setShowSuggestions(false);
 
-    // Simulate API call delay for recommendation generation
     await new Promise(resolve => setTimeout(resolve, 1500));
 
     try {
@@ -364,7 +495,7 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
             score = Math.max(score, 1);
         }
 
-        return { ...game, score };
+        return { ...game, score, isFavorite: favoritedGameIds.includes(game.id) }; // Add isFavorite flag
       });
 
       const sortedGames = scoredGames.sort((a, b) => b.score - a.score);
@@ -422,7 +553,7 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
     setRandomGameRecommendation(null);
     setAllSortedRecommendations([]);
     setCurrentPage(1);
-    setShowSuggestions(false); // Hide suggestions
+    setShowSuggestions(false);
 
     await new Promise(resolve => setTimeout(resolve, 1000));
 
@@ -443,7 +574,10 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
         return;
       }
       const randomIndex = Math.floor(Math.random() * gamesToPickFrom.length);
-      setRandomGameRecommendation(gamesToPickFrom[randomIndex]);
+      setRandomGameRecommendation({
+        ...gamesToPickFrom[randomIndex],
+        isFavorite: favoritedGameIds.includes(gamesToPickFrom[randomIndex].id) // Add isFavorite flag
+      });
     } catch (error) {
       console.error('Error generating random recommendation:', error);
       setErrorMessage('An unexpected error occurred while picking a random game.');
@@ -462,17 +596,30 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
     setRandomGameRecommendation(null);
     setAllSortedRecommendations([]);
     setCurrentPage(1);
-    setSuggestions([]); // Clear suggestions
-    setShowSuggestions(false); // Hide suggestions
+    setSuggestions([]);
+    setShowSuggestions(false);
   };
 
-  // Functions to open and close the help modal (Keep as is)
+  // Functions to open and close the help modal (Keep this as is)
   const openHelpModal = () => setShowHelpModal(true);
   const closeHelpModal = () => setShowHelpModal(false);
 
-  // Functions to open and close the Future Updates modal (Keep as is)
+  // Functions to open and close the Future Updates modal (Keep this as is)
   const openFutureUpdatesModal = () => setShowFutureUpdatesModal(true);
   const closeFutureUpdatesModal = () => setShowFutureUpdatesModal(false);
+
+  // Handle user logout
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      setErrorMessage(''); // Clear any previous errors
+      setIsSidebarOpen(false); // Close sidebar on logout
+      setCurrentPageView('home'); // Go back to home page on logout
+    } catch (error) {
+      setErrorMessage('Failed to log out: ' + error.message);
+      console.error('Logout error:', error);
+    }
+  };
 
   // Render error state if games data failed to load in the Server Component (Keep as is)
   if (gamesLoadError) {
@@ -489,261 +636,396 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
   const totalPages = Math.ceil(allSortedRecommendations.length / GAMES_PER_PAGE);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-600 to-indigo-800 flex items-center justify-center p-4 font-sans antialiased">
-      <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl transform transition-all duration-300 hover:scale-[1.01]">
-        <h1 className="text-4xl font-extrabold text-center text-gray-900 mb-6 tracking-tight">
-          <span className="bg-clip-text text-transparent bg-gradient-to-r from-pink-500 to-red-500">
-            RBXDiscover: A Roblox Game Recommender
-          </span> 🎮
-        </h1>
+    <div className="min-h-screen bg-gradient-to-br from-purple-600 to-indigo-800 flex items-center justify-center p-4 font-sans antialiased relative">
+      {/* Hamburger Icon for Sidebar */}
+      <button
+        id="hamburger-icon"
+        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+        // Changed default text color to purple-600 for visibility on white background
+        // md:text-white ensures it's white on larger screens (dark background)
+        // Removed hover:bg-opacity-20, added cursor-pointer
+        className="absolute top-4 left-4 z-40 text-purple-600 md:text-white focus:outline-none p-2 rounded-lg hover:bg-gray-200 cursor-pointer transition duration-200"
+        aria-label="Open sidebar menu"
+      >
+        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7"></path>
+        </svg>
+      </button>
 
-        <p className="text-center text-gray-600 mb-4 text-lg">
-          Discover your next favorite Roblox game! Select your preferences below or search directly.
-          <br className="hidden sm:inline" />
-          <span className="text-sm text-gray-500">Database updated weekly, last updated July 6th.</span>
-        </p>
+      {/* Sidebar Overlay (dims background when sidebar is open) */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-30 transition-opacity duration-300"
+          onClick={() => setIsSidebarOpen(false)} // Close sidebar when clicking overlay
+        ></div>
+      )}
 
-        <div className="text-center mb-4">
+      {/* Sidebar Content */}
+      <div
+        id="sidebar"
+        className={`fixed top-0 left-0 h-full bg-gradient-to-br from-purple-900 to-indigo-900 text-white w-64 p-6 shadow-lg z-40 flex flex-col justify-between transform transition-transform duration-300 ease-in-out
+          ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
+      >
+        <div> {/* Wrapper for top content */}
           <button
-            onClick={openHelpModal}
-            className="text-purple-600 hover:text-purple-800 text-base font-medium focus:outline-none transition duration-200 ease-in-out cursor-pointer"
+            onClick={() => setIsSidebarOpen(false)}
+            // Removed hover effect, added cursor-pointer
+            className="absolute top-4 right-4 text-white text-3xl focus:outline-none p-2 rounded-lg cursor-pointer transition duration-200"
+            aria-label="Close sidebar menu"
           >
-            How to Use This Website?
+            &times;
           </button>
-        </div>
-
-        <div className="text-center mb-8">
-          <button
-            onClick={openFutureUpdatesModal}
-            className="text-blue-600 hover:text-blue-800 text-base font-medium focus:outline-none transition duration-200 ease-in-out cursor-pointer"
-          >
-            Future Updates
-          </button>
-        </div>
-
-
-        {/* Search Bar with Autocomplete */}
-        <div className="mb-6 relative" ref={searchInputRef}> {/* Added relative and ref */}
-          <label htmlFor="gameSearch" className="block text-gray-700 text-lg font-semibold mb-2">
-            Search for a game by name, genre, or style:
-          </label>
-          <input
-            type="text"
-            id="gameSearch"
-            className="w-full px-4 py-3 rounded-lg border-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-800 text-base transition duration-200 ease-in-out"
-            placeholder="e.g., Adopt Me, horror, PvP"
-            value={searchTerm}
-            onChange={handleSearchInputChange} // Changed to new handler
-            onFocus={() => { // Show suggestions when input is focused and there's a search term
-                if (searchTerm.trim() && suggestions.length > 0) {
-                    setShowSuggestions(true);
-                } else if (searchTerm.trim() && !suggestions.length) {
-                    // If no suggestions were found yet, try to generate them when refocusing
-                    getSuggestions(searchTerm);
-                }
-            }}
-            aria-label="Search for games"
-            autoComplete="off" // Prevent browser's native autocomplete
-          />
-
-          {/* Autocomplete Suggestions Dropdown */}
-          {showSuggestions && suggestions.length > 0 && searchTerm.trim() && (
-            <ul className="absolute z-20 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-              {suggestions.map((suggestion) => (
-                <li
-                  key={suggestion}
-                  className="px-4 py-2 cursor-pointer hover:bg-gray-100 text-gray-900"
-                  onClick={() => handleSuggestionClick(suggestion)}
-                >
-                  {suggestion}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-
-        <div className="mb-6">
-          <MultiSelectDropdown
-            label="Preferred Genres"
-            options={allAvailableGenres}
-            selectedOptions={selectedGenres}
-            onSelect={setSelectedGenres}
-            limit={2}
-          />
-        </div>
-
-        <div className="mb-8">
-          <MultiSelectDropdown
-            label="Preferred Play Styles"
-            options={allAvailablePlayStyles}
-            selectedOptions={selectedPlayStyles}
-            onSelect={setSelectedPlayStyles}
-            limit={2}
-          />
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-4 mb-8">
-          <button
-            onClick={generateRecommendations}
-            disabled={isLoading || (selectedGenres.length === 0 && selectedPlayStyles.length === 0 && !searchTerm.trim())}
-            className={`flex-1 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg hover:from-blue-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition duration-300 ease-in-out text-xl transform hover:scale-105 ${isLoading || (selectedGenres.length === 0 && selectedPlayStyles.length === 0 && !searchTerm.trim()) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-            aria-live="polite"
-          >
-            {isLoading ? (
-              <span className="flex items-center justify-center">
-                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Recommending...
-              </span>
-            ) : (
-              'Get Smart Recommendations'
-            )}
-          </button>
-
-          <button
-            onClick={generateRandomRecommendation}
-            disabled={isLoading || gamesData.length === 0}
-            className={`flex-1 bg-gradient-to-r from-green-500 to-teal-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg hover:from-green-600 hover:to-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-300 ease-in-out text-xl transform hover:scale-105 ${isLoading || gamesData.length === 0 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-            aria-live="polite"
-          >
-            {isLoading ? (
-              <span className="flex items-center justify-center">
-                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Picking Random...
-              </span>
-            ) : (
-              'Get a Random Game'
-            )}
-          </button>
-        </div>
-
-        {(selectedGenres.length > 0 || selectedPlayStyles.length > 0 || searchTerm.trim() || recommendations.length > 0 || randomGameRecommendation) && (
-          <div className="text-center mt-4">
-            <button
-              onClick={clearAllFilters}
-              className="text-gray-500 hover:text-gray-800 text-sm font-medium focus:outline-none transition duration-200 ease-in-out cursor-pointer"
-            >
-              Clear All Filters & Recommendations
-            </button>
-          </div>
-        )}
-
-        {errorMessage && (
-          <div className="mt-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg text-center text-base" role="alert">
-            {errorMessage}
-          </div>
-        )}
-
-        {randomGameRecommendation && (
-          <div className="mt-8">
-            <h2 className="text-3xl font-bold text-gray-900 mb-5 text-center">
-              Your Random Pick:
-            </h2>
-            <div className="space-y-4">
-              <div
-                key={randomGameRecommendation.id}
-                className="block bg-purple-50 p-5 rounded-lg shadow-md border border-purple-200 hover:border-purple-400 transition duration-200 ease-in-out transform hover:-translate-y-1"
-              >
-                <h3 className="text-xl font-semibold text-purple-700 mb-1">{randomGameRecommendation.name}</h3>
-                <p className="text-gray-700 text-sm">
-                  <span className="font-medium">Genre:</span> {randomGameRecommendation.genre}
-                </p>
-                <p className="text-gray-700 text-sm">
-                  <span className="font-medium">Play Style:</span> {randomGameRecommendation.playStyle}
-                </p>
-                {randomGameRecommendation.theme && (
-                  <p className="text-gray-700 text-sm">
-                    <span className="font-medium">Theme:</span> {randomGameRecommendation.theme}
-                  </p>
-                )}
-                {randomGameRecommendation.link && (
-                  <a
-                    href={randomGameRecommendation.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-3 inline-block bg-blue-500 text-white font-bold py-2 px-4 rounded-lg shadow hover:bg-blue-600 transition duration-200 ease-in-out text-sm cursor-pointer"
-                  >
-                    Play on Roblox
-                  </a>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {recommendations.length > 0 && (
-          <div className="mt-8">
-            <h2 className="text-3xl font-bold text-gray-900 mb-5 text-center">
-              Your Top Smart Recommendations:
-            </h2>
-            <div className="space-y-4">
-              {recommendations.map((game) => (
-                <div
-                  key={game.id}
-                  className="block bg-purple-50 p-5 rounded-lg shadow-md border border-purple-200 hover:border-purple-400 transition duration-200 ease-in-out transform hover:-translate-y-1"
-                >
-                  <h3 className="text-xl font-semibold text-purple-700 mb-1">{game.name}</h3>
-                  <p className="text-gray-700 text-sm">
-                    <span className="font-medium">Genre:</span> {game.genre}
-                  </p>
-                  <p className="text-gray-700 text-sm">
-                    <span className="font-medium">Play Style:</span> {game.playStyle}
-                  </p>
-                  {game.theme && (
-                    <p className="text-gray-700 text-sm">
-                      <span className="font-medium">Theme:</span> {game.theme}
-                    </p>
-                  )}
-                  {game.link && (
-                    <a
-                      href={game.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-3 inline-block bg-blue-500 text-white font-bold py-2 px-4 rounded-lg shadow hover:bg-blue-600 transition duration-200 ease-in-out text-sm cursor-pointer"
-                    >
-                      Play on Roblox
-                    </a>
-                  )}
-                </div>
-              ))}
-            </div>
-            {allSortedRecommendations.length > GAMES_PER_PAGE && (
-              <div className="flex justify-center items-center gap-4 mt-6">
-                <button
-                  onClick={goToPreviousPage}
-                  disabled={isLoading || currentPage === 1}
-                  className={`bg-purple-500 text-white font-bold py-2 px-4 rounded-lg shadow hover:bg-purple-600 transition duration-200 ease-in-out text-base transform hover:scale-105 ${isLoading || currentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                </button>
-                <span className="text-gray-700 text-base font-medium">
-                  Page {currentPage} of {totalPages}
+          <div className="mt-12 flex flex-col space-y-4">
+            {loadingAuth ? (
+              <span className="text-white text-sm">Loading user...</span>
+            ) : user ? (
+              <>
+                {/* Email text with word wrapping */}
+                <span className="text-white text-lg font-medium break-words">
+                  Welcome, {user.displayName || user.email}!
                 </span>
+                {/* Favorites Button */}
                 <button
-                  onClick={goToNextPage}
-                  disabled={isLoading || currentPage === totalPages}
-                  className={`bg-purple-500 text-white font-bold py-2 px-4 rounded-lg shadow hover:bg-purple-600 transition duration-200 ease-in-out text-base transform hover:scale-105 ${isLoading || currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                  onClick={() => {
+                    setCurrentPageView('favorites');
+                    setIsSidebarOpen(false); // Close sidebar
+                  }}
+                  className="bg-white text-purple-800 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-gray-100 transition duration-200 ease-in-out text-base transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-purple-800 cursor-pointer"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                  </svg>
+                  Favorites
                 </button>
-              </div>
+              </>
+            ) : (
+              <button
+                onClick={() => {
+                  setAuthMode('signup');
+                  setShowAuthModal(true);
+                  setIsSidebarOpen(false); // Close sidebar when opening auth modal
+                }}
+                className="bg-white text-purple-800 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-gray-100 transition duration-200 ease-in-out text-base transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-purple-800 cursor-pointer"
+              >
+                Sign Up
+              </button>
             )}
+          </div>
+        </div> {/* End Wrapper for top content */}
+
+        {/* Logout Button at the bottom of the sidebar */}
+        {!loadingAuth && user && (
+          <div className="pb-4 px-2"> {/* Added padding for spacing from bottom */}
+            <button
+              onClick={handleLogout}
+              // Styled like the Favorites/Sign Up button
+              className="w-full bg-white text-purple-800 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-gray-100 transition duration-200 ease-in-out text-base transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-purple-800 cursor-pointer"
+            >
+              Logout
+            </button>
           </div>
         )}
       </div>
 
+      {/* Main Content Area - this single div will contain either the home or favorites view */}
+      <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl transform transition-all duration-300 hover:scale-[1.01]">
+        {/* Conditional Rendering of Home Page Content */}
+        {currentPageView === 'home' && (
+          <> {/* Use a fragment here if the home content has multiple top-level elements */}
+            <h1 className="text-4xl font-extrabold text-center text-gray-900 mb-6 tracking-tight">
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-pink-500 to-red-500">
+                RBXDiscover: A Roblox Game Recommender
+              </span> 🎮
+            </h1>
+
+            <p className="text-center text-gray-600 mb-4 text-lg">
+              Discover your next favorite Roblox game! Select your preferences below or search directly.
+              <br className="hidden sm:inline" />
+              <span className="text-sm text-gray-500">Database updated weekly, last updated July 6th.</span>
+            </p>
+
+            {/* How to Use Button */}
+            <div className="text-center mb-4">
+              <button
+                onClick={openHelpModal}
+                className="text-purple-600 hover:text-purple-800 text-base font-medium focus:outline-none transition duration-200 ease-in-out cursor-pointer"
+              >
+                How to Use This Website?
+              </button>
+            </div>
+
+            {/* Future Updates Button */}
+            <div className="text-center mb-8">
+              <button
+                onClick={openFutureUpdatesModal}
+                className="text-blue-600 hover:text-blue-800 text-base font-medium focus:outline-none transition duration-200 ease-in-out cursor-pointer"
+              >
+                Future Updates
+              </button>
+            </div>
+
+
+            {/* Search Bar with Autocomplete */}
+            <div className="mb-6 relative" ref={searchInputRef}>
+              <label htmlFor="gameSearch" className="block text-gray-700 text-lg font-semibold mb-2">
+                Search for a game by name, genre, or style:
+              </label>
+              <input
+                type="text"
+                id="gameSearch"
+                className="w-full px-4 py-3 rounded-lg border-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-800 text-base transition duration-200 ease-in-out"
+                placeholder="e.g., Adopt Me, horror, PvP"
+                value={searchTerm}
+                onChange={handleSearchInputChange}
+                onFocus={() => {
+                    if (searchTerm.trim() && suggestions.length > 0) {
+                        setShowSuggestions(true);
+                    } else if (searchTerm.trim() && !suggestions.length) {
+                        getSuggestions(searchTerm);
+                    }
+                }}
+                aria-label="Search for games"
+                autoComplete="off"
+              />
+
+              {/* Autocomplete Suggestions Dropdown */}
+              {showSuggestions && suggestions.length > 0 && searchTerm.trim() && (
+                <ul className="absolute z-20 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {suggestions.map((suggestion) => (
+                    <li
+                      key={suggestion}
+                      className="px-4 py-2 cursor-pointer hover:bg-gray-100 text-gray-900"
+                      onClick={() => handleSuggestionClick(suggestion)}
+                    >
+                      {suggestion}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+
+            <div className="mb-6">
+              <MultiSelectDropdown
+                label="Preferred Genres"
+                options={allAvailableGenres}
+                selectedOptions={selectedGenres}
+                onSelect={setSelectedGenres}
+                limit={2}
+              />
+            </div>
+
+            <div className="mb-8">
+              <MultiSelectDropdown
+                label="Preferred Play Styles"
+                options={allAvailablePlayStyles}
+                selectedOptions={selectedPlayStyles}
+                onSelect={setSelectedPlayStyles}
+                limit={2}
+              />
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-4 mb-8">
+              <button
+                onClick={generateRecommendations}
+                disabled={isLoading || (selectedGenres.length === 0 && selectedPlayStyles.length === 0 && !searchTerm.trim())}
+                className={`flex-1 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg hover:from-blue-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition duration-300 ease-in-out text-xl transform hover:scale-105 ${isLoading || (selectedGenres.length === 0 && selectedPlayStyles.length === 0 && !searchTerm.trim()) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                aria-live="polite"
+              >
+                {isLoading ? (
+                  <span className="flex items-center justify-center">
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Recommending...
+                </span>
+              ) : (
+                'Get Smart Recommendations'
+              )}
+            </button>
+
+            <button
+              onClick={generateRandomRecommendation}
+              disabled={isLoading || gamesData.length === 0}
+              className={`flex-1 bg-gradient-to-r from-green-500 to-teal-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg hover:from-green-600 hover:to-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-300 ease-in-out text-xl transform hover:scale-105 ${isLoading || gamesData.length === 0 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+              aria-live="polite"
+            >
+              {isLoading ? (
+                <span className="flex items-center justify-center">
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Picking Random...
+                </span>
+              ) : (
+                'Get a Random Game'
+              )}
+            </button>
+          </div>
+
+          {(selectedGenres.length > 0 || selectedPlayStyles.length > 0 || searchTerm.trim() || recommendations.length > 0 || randomGameRecommendation) && (
+            <div className="text-center mt-4">
+              <button
+                onClick={clearAllFilters}
+                className="text-gray-500 hover:text-gray-800 text-sm font-medium focus:outline-none transition duration-200 ease-in-out cursor-pointer"
+              >
+                Clear All Filters & Recommendations
+              </button>
+            </div>
+          )}
+
+          {errorMessage && (
+            <div className="mt-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg text-center text-base" role="alert">
+              {errorMessage}
+            </div>
+          )}
+
+          {/* Render individual game cards for recommendations or random pick */}
+          {randomGameRecommendation && (
+            <div className="mt-8">
+              <h2 className="text-3xl font-bold text-gray-900 mb-5 text-center">
+                Your Random Pick:
+              </h2>
+              <div className="space-y-4">
+                <GameCard
+                  game={randomGameRecommendation}
+                  toggleFavorite={toggleFavorite}
+                  isFavorite={randomGameRecommendation.isFavorite}
+                />
+              </div>
+            </div>
+          )}
+
+          {recommendations.length > 0 && (
+            <div className="mt-8">
+              <h2 className="text-3xl font-bold text-gray-900 mb-5 text-center">
+                Your Top Smart Recommendations:
+              </h2>
+              <div className="space-y-4">
+                {recommendations.map((game) => (
+                  <GameCard
+                    key={game.id}
+                    game={game}
+                    toggleFavorite={toggleFavorite}
+                    isFavorite={game.isFavorite}
+                  />
+                ))}
+              </div>
+              {allSortedRecommendations.length > GAMES_PER_PAGE && (
+                <div className="flex justify-center items-center gap-4 mt-6">
+                  <button
+                    onClick={goToPreviousPage}
+                    disabled={isLoading || currentPage === 1}
+                    className={`bg-purple-500 text-white font-bold py-2 px-4 rounded-lg shadow hover:bg-purple-600 transition duration-200 ease-in-out text-base transform hover:scale-105 ${isLoading || currentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                  <span className="text-gray-700 text-base font-medium">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button
+                    onClick={goToNextPage}
+                    disabled={isLoading || currentPage === totalPages}
+                    className={`bg-purple-500 text-white font-bold py-2 px-4 rounded-lg shadow hover:bg-purple-600 transition duration-200 ease-in-out text-base transform hover:scale-105 ${isLoading || currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+          </>
+        )}
+
+        {/* Conditional Rendering of Favorites Page */}
+        {currentPageView === 'favorites' && (
+          <FavoritesPage
+            user={user}
+            gamesData={gamesData}
+            favoritedGameIds={favoritedGameIds}
+            toggleFavorite={toggleFavorite}
+            onBackToHome={() => setCurrentPageView('home')}
+          />
+        )}
+      </div> {/* End of Main Content Area */}
+
+
       {showHelpModal && <HelpModal onClose={closeHelpModal} />}
       {showFutureUpdatesModal && <FutureUpdatesModal onClose={closeFutureUpdatesModal} />}
+
+      {/* Render AuthModal conditionally */}
+      {showAuthModal && (
+        <AuthModal
+          onClose={() => setShowAuthModal(false)}
+          onAuthSuccess={() => {
+            setShowAuthModal(false);
+            // Optionally, show a success message or redirect
+          }}
+          initialMode={authMode} // Pass the initial mode to the modal
+        />
+      )}
     </div>
   );
 }
+
+// NEW: GameCard Component - extracted for reusability and favorite button
+const GameCard = ({ game, toggleFavorite, isFavorite }) => {
+  return (
+    <div
+      key={game.id}
+      className="block bg-purple-50 p-5 rounded-lg shadow-md border border-purple-200 hover:border-purple-400 transition duration-200 ease-in-out transform hover:-translate-y-1 relative"
+    >
+      <h3 className="text-xl font-semibold text-purple-700 mb-1">{game.name}</h3>
+      <p className="text-gray-700 text-sm">
+        <span className="font-medium">Genre:</span> {game.genre}
+      </p>
+      <p className="text-gray-700 text-sm">
+        <span className="font-medium">Play Style:</span> {game.playStyle}
+      </p>
+      {game.theme && (
+        <p className="text-gray-700 text-sm">
+          <span className="font-medium">Theme:</span> {game.theme}
+        </p>
+      )}
+      {game.link && (
+        <a
+          href={game.link}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-3 inline-block bg-blue-500 text-white font-bold py-2 px-4 rounded-lg shadow hover:bg-blue-600 transition duration-200 ease-in-out text-sm cursor-pointer"
+        >
+          Play on Roblox
+        </a>
+      )}
+      {/* Favorite Button/Icon */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation(); // Prevent card click from triggering
+          toggleFavorite(game.id);
+        }}
+        className={`absolute top-3 right-3 p-2 rounded-full transition-colors duration-200
+          ${isFavorite ? 'text-red-500 hover:text-red-600' : 'text-gray-400 hover:text-red-400'}`}
+        aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="h-6 w-6 fill-current"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth="2"
+          // Always fill with currentColor to make it solid
+          fill="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M4.318 6.318a4.5 4.5 0 000 6.364L12 22.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+          />
+        </svg>
+      </button>
+    </div>
+  );
+};
