@@ -15,6 +15,8 @@ import { doc, getDoc, collection, addDoc, deleteDoc, getDocs, query, where } fro
 import AuthModal from '../components/AuthModal';
 // Import the new FavoritesPage component
 import FavoritesPage from '../components/FavoritesPage';
+// NEW: Import the AIChatPage component
+import AIChatPage from '../components/AIChatPage';
 
 // Fisher-Yates (Knuth) shuffle algorithm (Keep this as is)
 const shuffleArray = (array) => {
@@ -250,11 +252,22 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
   // State for sidebar
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // NEW: State to manage current view ('home' or 'favorites')
+  // State to manage current view ('home', 'favorites', or 'aiChat')
   const [currentPageView, setCurrentPageView] = useState('home');
 
-  // NEW: State to store favorited game IDs for the current user
+  // State to store favorited game IDs for the current user
   const [favoritedGameIds, setFavoritedGameIds] = useState([]);
+
+  // NEW: State for AI chat guest request count (keeping the state, but limit logic removed from AIChatPage)
+  const GUEST_AI_REQUEST_LIMIT = 2; // Still defined, but not enforced in AIChatPage for now
+  const [aiRequestCount, setAiRequestCount] = useState(() => {
+    // Initialize from sessionStorage to persist across refreshes for anonymous users
+    if (typeof window !== 'undefined') {
+      const savedCount = sessionStorage.getItem('aiRequestCount');
+      return savedCount ? parseInt(savedCount, 10) : 0;
+    }
+    return 0;
+  });
 
   const [allSortedRecommendations, setAllSortedRecommendations] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -268,12 +281,30 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
       // Fetch favorites when user auth state changes
       if (currentUser) {
         fetchFavoritedGameIds(currentUser.uid);
+        // Reset AI request count for logged-in users, or allow unlimited
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('aiRequestCount');
+        }
+        setAiRequestCount(0); // Logged-in users have unlimited access
       } else {
         setFavoritedGameIds([]); // Clear favorites if logged out
+        // For anonymous users, ensure count is loaded from session storage
+        if (typeof window !== 'undefined') {
+          const savedCount = sessionStorage.getItem('aiRequestCount');
+          setAiRequestCount(savedCount ? parseInt(savedCount, 10) : 0);
+        }
       }
     });
     return () => unsubscribe(); // Cleanup subscription
   }, []);
+
+  // Effect to save AI request count to sessionStorage
+  useEffect(() => {
+    if (!user && typeof window !== 'undefined') { // Only save for anonymous users
+      sessionStorage.setItem('aiRequestCount', aiRequestCount.toString());
+    }
+  }, [aiRequestCount, user]);
+
 
   // Effect to close sidebar when clicking outside
   useEffect(() => {
@@ -297,7 +328,7 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
     };
   }, [isSidebarOpen]);
 
-  // NEW: Function to fetch favorited game IDs from Firestore
+  // Function to fetch favorited game IDs from Firestore
   const fetchFavoritedGameIds = async (userId) => {
     if (!userId) {
       setFavoritedGameIds([]);
@@ -317,7 +348,7 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
     }
   };
 
-  // NEW: Function to toggle a game's favorite status
+  // Function to toggle a game's favorite status
   const toggleFavorite = async (gameId) => {
     if (!user) {
       setErrorMessage("Please log in to favorite games.");
@@ -615,6 +646,10 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
       setErrorMessage(''); // Clear any previous errors
       setIsSidebarOpen(false); // Close sidebar on logout
       setCurrentPageView('home'); // Go back to home page on logout
+      setAiRequestCount(0); // Reset AI count for new anonymous session
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('aiRequestCount');
+      }
     } catch (error) {
       setErrorMessage('Failed to log out: ' + error.message);
       console.error('Logout error:', error);
@@ -684,6 +719,16 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
                 <span className="text-white text-lg font-medium break-words">
                   Welcome, {user.displayName || user.email}!
                 </span>
+                {/* Home Button */}
+                <button
+                  onClick={() => {
+                    setCurrentPageView('home');
+                    setIsSidebarOpen(false); // Close sidebar
+                  }}
+                  className="bg-white text-purple-800 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-gray-100 transition duration-200 ease-in-out text-base transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-purple-800 cursor-pointer"
+                >
+                  Home
+                </button>
                 {/* Favorites Button */}
                 <button
                   onClick={() => {
@@ -694,18 +739,46 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
                 >
                   Favorites
                 </button>
+                {/* NEW: AI Chat Button for logged-in users */}
+                <button
+                  onClick={() => {
+                    setCurrentPageView('aiChat');
+                    setIsSidebarOpen(false); // Close sidebar
+                  }}
+                  className="bg-white text-purple-800 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-gray-100 transition duration-200 ease-in-out text-base transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-purple-800 cursor-pointer"
+                >
+                  AI Chat
+                </button>
               </>
             ) : (
-              <button
-                onClick={() => {
-                  setAuthMode('signup');
-                  setShowAuthModal(true);
-                  setIsSidebarOpen(false); // Close sidebar when opening auth modal
-                }}
-                className="bg-white text-purple-800 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-gray-100 transition duration-200 ease-in-out text-base transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-purple-800 cursor-pointer"
-              >
-                Sign Up
-              </button>
+              <>
+                <button
+                  onClick={() => {
+                    setAuthMode('signup');
+                    setShowAuthModal(true);
+                    setIsSidebarOpen(false); // Close sidebar when opening auth modal
+                  }}
+                  className="bg-white text-purple-800 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-gray-100 transition duration-200 ease-in-out text-base transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-purple-800 cursor-pointer"
+                >
+                  Sign Up
+                </button>
+                {/* NEW: AI Chat Button for guest users */}
+                <button
+                  onClick={() => {
+                    setCurrentPageView('aiChat');
+                    setIsSidebarOpen(false); // Close sidebar
+                  }}
+                  className="bg-white text-purple-800 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-gray-100 transition duration-200 ease-in-out text-base transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-purple-800 cursor-pointer"
+                >
+                  AI Chat
+                  {/* Removed guest request count display as the limit is removed */}
+                  {/* {aiRequestCount < GUEST_AI_REQUEST_LIMIT && (
+                    <span className="ml-2 px-2 py-1 text-xs font-semibold text-white bg-blue-500 rounded-full">
+                      {GUEST_AI_REQUEST_LIMIT - aiRequestCount} left
+                    </span>
+                  )} */}
+                </button>
+              </>
             )}
           </div>
         </div> {/* End Wrapper for top content */}
@@ -947,6 +1020,19 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
             gamesData={gamesData}
             favoritedGameIds={favoritedGameIds}
             toggleFavorite={toggleFavorite}
+            onBackToHome={() => setCurrentPageView('home')}
+          />
+        )}
+
+        {/* NEW: Conditional Rendering of AI Chat Page */}
+        {currentPageView === 'aiChat' && (
+          <AIChatPage
+            user={user}
+            aiRequestCount={aiRequestCount}
+            setAiRequestCount={setAiRequestCount}
+            guestLimit={GUEST_AI_REQUEST_LIMIT}
+            setAuthMode={setAuthMode}
+            setShowAuthModal={setShowAuthModal}
             onBackToHome={() => setCurrentPageView('home')}
           />
         )}
