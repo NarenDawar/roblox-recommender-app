@@ -5,7 +5,7 @@ import React, { useState, useRef, useEffect } from 'react';
 
 // IMPORTANT: Replace with your actual OpenRouter API Key.
 // This key should ideally be loaded from a secure environment variable in a real application.
-const OPENROUTER_API_KEY = "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"; // <<<--- ADD YOUR OPENROUTER API KEY HERE
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY; // <<<--- ADD YOUR OPENROUTER API KEY HERE
 const availableGames = require('../../utility/roblox_games_data.json'); // Ensure this path is correct
 
 // Helper function to render basic Markdown (bold, italics) to HTML
@@ -56,7 +56,7 @@ const AIChatPage = ({ user, aiRequestCount, guestLimit, setAuthMode, setShowAuth
       const chatHistory = [
         { role: 'system', content: `You are a helpful Roblox game AI recommender. Based on the user's description, suggest 1 to 3 Roblox games that match their preferences.
         For each recommendation, provide the game name, a brief reason for the recommendation, and a relevant genre or playstyle.
-        The only Roblox games you may recommend are these: ${availableGames}.` },
+        The only Roblox games you may recommend are in this array: ${availableGames}.` },
         ...messages, // Include previous messages for context
         userMessage // Add the current user message
       ];
