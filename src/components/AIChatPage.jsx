@@ -5,7 +5,7 @@ import React, { useState, useRef, useEffect } from 'react';
 
 // IMPORTANT: Replace with your actual OpenRouter API Key.
 // This key should ideally be loaded from a secure environment variable in a real application.
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY; // <<<--- ADD YOUR OPENROUTER API KEY HERE
+const open_key = process.env.OPENROUTER_API_KEY; 
 const availableGames = require('../../utility/roblox_games_data.json'); // Ensure this path is correct
 
 // Helper function to render basic Markdown (bold, italics) to HTML
@@ -49,7 +49,7 @@ const AIChatPage = ({ user, aiRequestCount, guestLimit, setAuthMode, setShowAuth
     setIsLoading(true);
 
     try {
-      if (!OPENROUTER_API_KEY) {
+      if (!open_key) {
         throw new Error("OpenRouter API Key is not set. Please add it to components/AIChatPage.jsx");
       }
 
@@ -70,7 +70,7 @@ const AIChatPage = ({ user, aiRequestCount, guestLimit, setAuthMode, setShowAuth
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+          'Authorization': `Bearer ${open_key}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),
