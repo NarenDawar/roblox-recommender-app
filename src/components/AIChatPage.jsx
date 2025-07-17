@@ -3,11 +3,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 
-// IMPORTANT: Replace with your actual OpenRouter API Key.
-// This key should ideally be loaded from a secure environment variable in a real application.
-const open_key = process.env.OPENROUTER_API_KEY; 
-const availableGames = require('../../utility/roblox_games_data.json'); // Ensure this path is correct
-
 // Helper function to render basic Markdown (bold, italics) to HTML
 const renderMarkdown = (markdownText) => {
   let html = markdownText;
@@ -42,49 +37,31 @@ const AIChatPage = ({ user, aiRequestCount, guestLimit, setAuthMode, setShowAuth
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!inputMessage.trim() || isLoading || isGuestLimited) return;
-
+  
     const userMessage = { role: 'user', content: inputMessage };
     setMessages((prevMessages) => [...prevMessages, userMessage]);
     setInputMessage('');
     setIsLoading(true);
-
+  
     try {
-      if (!open_key) {
-        throw new Error("OpenRouter API Key is not set. Please add it to components/AIChatPage.jsx");
-      }
-
-      const chatHistory = [
-        { role: 'system', content: `You are a helpful Roblox game AI recommender. Based on the user's description, suggest 1 to 3 Roblox games that match their preferences.
-        For each recommendation, provide the game name, a brief reason for the recommendation, and a relevant genre or playstyle.
-        The only Roblox games you may recommend are in this array: ${availableGames}.` },
-        ...messages, // Include previous messages for context
-        userMessage // Add the current user message
-      ];
-
-      const payload = {
-        model: "deepseek/deepseek-chat-v3-0324:free",
-        messages: chatHistory,
-        stream: false,
-      };
-
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      // Send request to YOUR OWN API endpoint
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${open_key}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ messages: [...messages, userMessage] }), // Send full chat history
       });
-
+  
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(`API error: ${response.status} - ${errorData.message || response.statusText}`);
+        throw new Error(`Our server error: ${response.status} - ${errorData.message || response.statusText}`);
       }
-
-      const data = await response.json();
+  
+      const data = await response.json(); // This is the response from our API route
       const aiResponseContent = data.choices[0]?.message?.content || "Sorry, I couldn't generate a recommendation right now. Please try again.";
       setMessages((prevMessages) => [...prevMessages, { role: 'assistant', content: aiResponseContent }]);
-
+  
     } catch (error) {
       console.error("Error fetching AI recommendation:", error);
       setMessages((prevMessages) => [
