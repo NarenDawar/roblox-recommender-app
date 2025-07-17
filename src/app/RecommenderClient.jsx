@@ -15,7 +15,7 @@ import { doc, getDoc, collection, addDoc, deleteDoc, getDocs, query, where } fro
 import AuthModal from '../components/AuthModal';
 // Import the new FavoritesPage component
 import FavoritesPage from '../components/FavoritesPage';
-// NEW: Import the AIChatPage component
+// NEW: Import the new AIChatPage component
 import AIChatPage from '../components/AIChatPage';
 
 // Fisher-Yates (Knuth) shuffle algorithm (Keep this as is)
@@ -258,8 +258,8 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
   // State to store favorited game IDs for the current user
   const [favoritedGameIds, setFavoritedGameIds] = useState([]);
 
-  // NEW: State for AI chat guest request count (keeping the state, but limit logic removed from AIChatPage)
-  const GUEST_AI_REQUEST_LIMIT = 2; // Still defined, but not enforced in AIChatPage for now
+  // Re-adding the 2-request limit for guests
+  const GUEST_AI_REQUEST_LIMIT = 2;
   const [aiRequestCount, setAiRequestCount] = useState(() => {
     // Initialize from sessionStorage to persist across refreshes for anonymous users
     if (typeof window !== 'undefined') {
@@ -670,16 +670,20 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
 
   const totalPages = Math.ceil(allSortedRecommendations.length / GAMES_PER_PAGE);
 
+  // Determine the color of the hamburger icon based on the current page view
+  // On 'home' page, it's purple by default and white on md screens up (for dark background)
+  // On other pages (favorites, aiChat), it's always white (as it's on a dark background)
+  const hamburgerColorClass = currentPageView === 'home'
+    ? 'text-purple-600 md:text-white' // Home page behavior: purple on small, white on md+
+    : 'text-white'; // Other pages: always white
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-600 to-indigo-800 flex items-center justify-center p-4 font-sans antialiased relative">
       {/* Hamburger Icon for Sidebar */}
       <button
         id="hamburger-icon"
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-        // Changed default text color to purple-600 for visibility on white background
-        // md:text-white ensures it's white on larger screens (dark background)
-        // Removed hover:bg-opacity-20, added cursor-pointer
-        className="absolute top-4 left-4 z-40 text-purple-600 md:text-white focus:outline-none p-2 rounded-lg hover:bg-gray-200 cursor-pointer transition duration-200"
+        className={`absolute top-4 left-4 z-40 ${hamburgerColorClass} focus:outline-none p-2 rounded-lg hover:bg-gray-200 cursor-pointer transition duration-200`}
         aria-label="Open sidebar menu"
       >
         <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -711,15 +715,16 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
             &times;
           </button>
           <div className="mt-12 flex flex-col space-y-4">
+            {/* Conditional rendering for user state */}
             {loadingAuth ? (
               <span className="text-white text-sm">Loading user...</span>
             ) : user ? (
               <>
-                {/* Email text with word wrapping */}
+                {/* Email text with word wrapping - now first */}
                 <span className="text-white text-lg font-medium break-words">
                   Welcome, {user.displayName || user.email}!
                 </span>
-                {/* Home Button */}
+                {/* Home Button - now second */}
                 <button
                   onClick={() => {
                     setCurrentPageView('home');
@@ -752,6 +757,16 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
               </>
             ) : (
               <>
+                {/* Home Button (remains here for guests) */}
+                <button
+                  onClick={() => {
+                    setCurrentPageView('home');
+                    setIsSidebarOpen(false); // Close sidebar
+                  }}
+                  className="bg-white text-purple-800 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-gray-100 transition duration-200 ease-in-out text-base transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-purple-800 cursor-pointer"
+                >
+                  Home
+                </button>
                 <button
                   onClick={() => {
                     setAuthMode('signup');
@@ -771,12 +786,12 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
                   className="bg-white text-purple-800 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-gray-100 transition duration-200 ease-in-out text-base transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-purple-800 cursor-pointer"
                 >
                   AI Chat
-                  {/* Removed guest request count display as the limit is removed */}
-                  {/* {aiRequestCount < GUEST_AI_REQUEST_LIMIT && (
+                  {/* Re-added guest request count display */}
+                  {aiRequestCount < GUEST_AI_REQUEST_LIMIT && (
                     <span className="ml-2 px-2 py-1 text-xs font-semibold text-white bg-blue-500 rounded-full">
                       {GUEST_AI_REQUEST_LIMIT - aiRequestCount} left
                     </span>
-                  )} */}
+                  )}
                 </button>
               </>
             )}
@@ -798,8 +813,13 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
       </div>
 
       {/* Main Content Area - this single div will contain either the home or favorites view */}
-      <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl transform transition-all duration-300 hover:scale-[1.01]">
-        {/* Conditional Rendering of Home Page Content */}
+      {/* The main content div is now conditionally rendered inside RecommenderClient */}
+      {/* Its background will change depending on the currentPageView */}
+      <div className={`
+        ${currentPageView === 'home' ? 'bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl transform transition-all duration-300 hover:scale-[1.01]' : ''}
+        ${currentPageView === 'favorites' ? 'w-full h-full max-w-2xl transform transition-all duration-300' : ''}
+        ${currentPageView === 'aiChat' ? 'w-full h-full transform transition-all duration-300' : ''}
+      `}>
         {currentPageView === 'home' && (
           <> {/* Use a fragment here if the home content has multiple top-level elements */}
             <h1 className="text-4xl font-extrabold text-center text-gray-900 mb-6 tracking-tight">

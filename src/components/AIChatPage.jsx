@@ -6,6 +6,7 @@ import React, { useState, useRef, useEffect } from 'react';
 // IMPORTANT: Replace with your actual OpenRouter API Key.
 // This key should ideally be loaded from a secure environment variable in a real application.
 const OPENROUTER_API_KEY = "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"; // <<<--- ADD YOUR OPENROUTER API KEY HERE
+const availableGames = require('../../utility/roblox_games_data.json'); // Ensure this path is correct
 
 // Helper function to render basic Markdown (bold, italics) to HTML
 const renderMarkdown = (markdownText) => {
@@ -22,7 +23,7 @@ const renderMarkdown = (markdownText) => {
 };
 
 
-const AIChatPage = ({ user, aiRequestCount, setAiRequestCount, guestLimit, setAuthMode, setShowAuthModal, onBackToHome }) => {
+const AIChatPage = ({ user, aiRequestCount, guestLimit, setAuthMode, setShowAuthModal, onBackToHome }) => {
   const [messages, setMessages] = useState([
     { role: 'assistant', content: "Hello! I'm your Roblox game AI recommender. Tell me about the kind of game you're looking for, or describe a game you like, and I'll suggest 1-3 games for you." }
   ]);
@@ -35,9 +36,8 @@ const AIChatPage = ({ user, aiRequestCount, setAiRequestCount, guestLimit, setAu
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Check if the user is a guest and has exceeded the limit
   // isGuestLimited is now always false, effectively removing the limit
-  const isGuestLimited = false; // Removed guest limit for now
+  const isGuestLimited = false;
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
@@ -48,29 +48,23 @@ const AIChatPage = ({ user, aiRequestCount, setAiRequestCount, guestLimit, setAu
     setInputMessage('');
     setIsLoading(true);
 
-    // No longer incrementing guest request count as the limit is removed
-    // if (!user) {
-    //   setAiRequestCount(prevCount => prevCount + 1);
-    // }
-
     try {
       if (!OPENROUTER_API_KEY) {
         throw new Error("OpenRouter API Key is not set. Please add it to components/AIChatPage.jsx");
       }
 
       const chatHistory = [
-        { role: 'system', content: ```You are a helpful Roblox game AI recommender. Based on the user's description, suggest 1 to 3 Roblox games that match their preferences. 
-            Provide the game name, a brief reason for the recommendation, and if possible, a relevant genre or playstyle. Be concise and focus on direct recommendations. 
-            If you cannot find a suitable game, politely state that and offer to try again with a different description.
-            When recommending a game, verify that it exists on the Roblox platform at the time of the request and has active users. Otherwise, recommend a different relevant game.``` },
+        { role: 'system', content: `You are a helpful Roblox game AI recommender. Based on the user's description, suggest 1 to 3 Roblox games that match their preferences.
+        For each recommendation, provide the game name, a brief reason for the recommendation, and a relevant genre or playstyle.
+        The only Roblox games you may recommend are these: ${availableGames}.` },
         ...messages, // Include previous messages for context
         userMessage // Add the current user message
       ];
 
       const payload = {
-        model: "deepseek/deepseek-chat-v3-0324:free", // Using DeepSeek-V3 as requested
+        model: "deepseek/deepseek-chat-v3-0324:free",
         messages: chatHistory,
-        stream: false, // Canvas environment typically does not support streaming external LLM APIs
+        stream: false,
       };
 
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -103,86 +97,64 @@ const AIChatPage = ({ user, aiRequestCount, setAiRequestCount, guestLimit, setAu
   };
 
   return (
-    <div className="flex flex-col h-full bg-white rounded-xl shadow-2xl w-full max-w-2xl transform transition-all duration-300">
-      <div className="flex-none p-4 border-b border-gray-200 flex items-center justify-between">
-        <button
-          onClick={onBackToHome}
-          className="bg-purple-500 text-white font-bold py-2 px-4 rounded-lg shadow hover:bg-purple-600 transition duration-200 ease-in-out text-base transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-white cursor-pointer"
-        >
-          ← Back to Recommender
-        </button>
-        <h2 className="text-2xl font-bold text-gray-800">AI Game Chat</h2>
-        <div></div> {/* Placeholder for alignment */}
-      </div>
+    <div className="flex flex-col h-full bg-white rounded-xl shadow-2xl w-full max-w-full sm:max-w-xl md:max-w-2xl lg:max-w-3xl xl:max-w-4xl mx-auto transform transition-all duration-300 my-4 sm:my-8">
+      <div className="flex flex-col bg-white rounded-xl shadow-2xl w-full h-[70vh] max-h-[800px] sm:max-w-xl md:max-w-2xl lg:max-w-3xl xl:max-w-4xl mx-auto"> {/* Added fixed height and max-height here */}
+        <div className="flex-none p-3 sm:p-4 border-b border-gray-200 flex items-center justify-center">
+          <h2 className="text-lg sm:text-2xl font-bold text-gray-800">AI Game Chat</h2>
+        </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((msg, index) => (
-          <div
-            key={index}
-            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
+        <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4">
+          {messages.map((msg, index) => (
             <div
-              className={`max-w-[80%] p-3 rounded-lg shadow-md ${
-                msg.role === 'user'
-                  ? 'bg-blue-500 text-white rounded-br-none'
-                  : 'bg-gray-100 text-gray-800 rounded-bl-none'
-              }`}
+              key={index}
+              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
-              {/* Render Markdown content using dangerouslySetInnerHTML */}
-              <p className="text-sm" dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}></p>
-            </div>
-          </div>
-        ))}
-        {isLoading && (
-          <div className="flex justify-start">
-            <div className="max-w-[80%] p-3 rounded-lg shadow-md bg-gray-100 text-gray-800 rounded-bl-none">
-              <div className="flex items-center">
-                <span className="animate-pulse text-sm">Thinking...</span>
-                <svg className="animate-spin ml-2 h-4 w-4 text-gray-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
+              <div
+                className={`max-w-[85%] sm:max-w-[80%] p-3 rounded-lg shadow-md ${
+                  msg.role === 'user'
+                    ? 'bg-blue-500 text-white rounded-br-none'
+                    : 'bg-gray-100 text-gray-800 rounded-bl-none'
+                }`}
+              >
+                <p className="text-sm sm:text-base" dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}></p>
               </div>
             </div>
-          </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
+          ))}
+          {isLoading && (
+            <div className="flex justify-start">
+              <div className="max-w-[85%] sm:max-w-[80%] p-3 rounded-lg shadow-md bg-gray-100 text-gray-800 rounded-bl-none">
+                <div className="flex items-center">
+                  <span className="animate-pulse text-sm sm:text-base">Thinking...</span>
+                  <svg className="animate-spin ml-2 h-4 w-4 text-gray-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
 
-      <div className="flex-none p-4 border-t border-gray-200">
-        {/* Removed the guest limit message as the limit is removed */}
-        {/* {isGuestLimited && (
-          <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded-lg mb-4 text-center text-sm">
-            You've used all {guestLimit} free AI requests. Please{' '}
+        <div className="flex-none p-3 sm:p-4 border-t border-gray-200">
+          <form onSubmit={handleSendMessage} className="flex gap-2 sm:gap-3">
+            <input
+              type="text"
+              className="flex-1 px-3 py-2 sm:px-4 sm:py-2 rounded-lg border-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-800 text-sm sm:text-base"
+              placeholder={"Describe the game you're looking for..."}
+              value={inputMessage}
+              onChange={(e) => setInputMessage(e.target.value)}
+              disabled={isLoading}
+            />
             <button
-              onClick={() => {
-                setAuthMode('signup');
-                setShowAuthModal(true);
-              }}
-              className="font-bold text-yellow-800 hover:underline"
+              type="submit"
+              className="bg-purple-500 text-white font-bold py-2 px-3 sm:px-4 rounded-lg shadow hover:bg-purple-600 transition duration-200 ease-in-out transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
+              disabled={isLoading}
             >
-              Sign Up
-            </button>{' '}
-            for unlimited access!
-          </div>
-        )} */}
-        <form onSubmit={handleSendMessage} className="flex gap-2">
-          <input
-            type="text"
-            className="flex-1 px-4 py-2 rounded-lg border-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-800"
-            placeholder={"Describe the game you're looking for..."} // Placeholder simplified
-            value={inputMessage}
-            onChange={(e) => setInputMessage(e.target.value)}
-            disabled={isLoading} // isGuestLimited removed from here
-          />
-          <button
-            type="submit"
-            className="bg-purple-500 text-white font-bold py-2 px-4 rounded-lg shadow hover:bg-purple-600 transition duration-200 ease-in-out transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={isLoading} // isGuestLimited removed from here
-          >
-            Send
-          </button>
-        </form>
+              Send
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );
