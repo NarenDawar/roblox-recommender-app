@@ -273,6 +273,13 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
   const [currentPage, setCurrentPage] = useState(1);
   const GAMES_PER_PAGE = 5;
 
+  // NEW: State for welcome screen
+  const [showWelcomeScreen, setShowWelcomeScreen] = useState(false);
+  const [isFadingOut, setIsFadingOut] = useState(false);
+  // NEW: State for the second welcome message's fade in/out
+  const [showSecondaryWelcomeMessage, setShowSecondaryWelcomeMessage] = useState(false);
+
+
   // Auth state listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -297,6 +304,40 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
     });
     return () => unsubscribe(); // Cleanup subscription
   }, []);
+
+  // Effect for welcome screen - MODIFIED
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const hasVisited = sessionStorage.getItem('hasVisitedRBXDiscover');
+      if (!hasVisited) {
+        setShowWelcomeScreen(true);
+        sessionStorage.setItem('hasVisitedRBXDiscover', 'true');
+
+        // Fade in main message (already visible from setShowWelcomeScreen(true))
+        // Then fade in secondary message
+        const secondaryMessageTimer = setTimeout(() => {
+          setShowSecondaryWelcomeMessage(true);
+        }, 1000); // Secondary message fades in after 1 second
+
+        // Start fade out for both messages after a delay
+        const fadeOutTimer = setTimeout(() => {
+          setIsFadingOut(true);
+          setShowSecondaryWelcomeMessage(false); // Also fade out secondary message
+        }, 3000); // Start fade out after 3 seconds (1s for primary, 1s for secondary, 1s visible for both)
+
+        const hideTimer = setTimeout(() => {
+          setShowWelcomeScreen(false);
+          setIsFadingOut(false);
+        }, 4000); // Fully hide after 4 seconds (1s for primary, 1s for secondary, 1s visible for both, 1s fade-out)
+
+        return () => {
+          clearTimeout(secondaryMessageTimer);
+          clearTimeout(fadeOutTimer);
+          clearTimeout(hideTimer);
+        };
+      }
+    }
+  }, []); // Only run once on mount
 
   // Effect to save AI request count to sessionStorage
   useEffect(() => {
@@ -679,6 +720,18 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-600 to-indigo-800 flex items-center justify-center p-4 font-sans antialiased relative">
+      {/* Welcome Screen Overlay - MODIFIED */}
+      {showWelcomeScreen && (
+        <div className={`fixed inset-0 bg-gradient-to-br from-purple-800 to-indigo-900 flex flex-col items-center justify-center z-50 transition-opacity duration-1000 ${isFadingOut ? 'opacity-0' : 'opacity-100'}`}>
+          <h1 className={`text-5xl font-extrabold text-white text-center transition-opacity duration-1000 ${isFadingOut ? 'opacity-0' : 'opacity-100'}`}>
+            Welcome to RBXDiscover!
+          </h1>
+          <p className={`text-3xl font-bold text-white text-center mt-4 transition-opacity duration-1000 ${showSecondaryWelcomeMessage ? 'opacity-100' : 'opacity-0'}`}>
+            We hope you enjoy!
+          </p>
+        </div>
+      )}
+
       {/* Hamburger Icon for Sidebar */}
       <button
         id="hamburger-icon"
