@@ -48,7 +48,7 @@ export async function POST(request) {
             // You could also use "gpt-4" or "gpt-4o" for higher quality but higher cost
             messages: chatHistory,
             stream: false, // Keep false as per your current setup
-            temperature: 1.5, // Add temperature for creativity (0.0 for strict, 1.0 for creative)
+            temperature: 1.7, // Add temperature for creativity (0.0 for strict, 1.0 for creative)
             max_tokens: 300 // Limit output tokens to control cost and verbosity
         };
 

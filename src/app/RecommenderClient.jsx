@@ -15,8 +15,7 @@ import { doc, getDoc, collection, addDoc, deleteDoc, getDocs, query, where } fro
 import AuthModal from '../components/AuthModal';
 // Import the new FavoritesPage component
 import FavoritesPage from '../components/FavoritesPage';
-// NEW: Import the new AIChatPage component
-import AIChatPage from '../components/AIChatPage';
+// NEW: Import the new AIChatPage component - REMOVED FOR NOW
 
 // Fisher-Yates (Knuth) shuffle algorithm (Keep this as is)
 const shuffleArray = (array) => {
@@ -141,7 +140,7 @@ const MultiSelectDropdown = ({ options, selectedOptions, onSelect, limit, label 
   );
 };
 
-// HelpModal Component (Keep this as is)
+// HelpModal Component
 const HelpModal = ({ onClose }) => {
   return (
     <div className="fixed inset-0 bg-gradient-to-br from-purple-800 to-indigo-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
@@ -190,7 +189,7 @@ const HelpModal = ({ onClose }) => {
   );
 };
 
-// FutureUpdatesModal Component (Keep this as is)
+// FutureUpdatesModal Component
 const FutureUpdatesModal = ({ onClose }) => {
   return (
     <div className="fixed inset-0 bg-gradient-to-br from-purple-800 to-indigo-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
@@ -672,11 +671,11 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
     setShowSuggestions(false);
   };
 
-  // Functions to open and close the help modal (Keep this as is)
+  // Functions to open and close the help modal
   const openHelpModal = () => setShowHelpModal(true);
   const closeHelpModal = () => setShowHelpModal(false);
 
-  // Functions to open and close the Future Updates modal (Keep this as is)
+  // Functions to open and close the Future Updates modal
   const openFutureUpdatesModal = () => setShowFutureUpdatesModal(true);
   const closeFutureUpdatesModal = () => setShowFutureUpdatesModal(false);
 
@@ -697,7 +696,7 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
     }
   };
 
-  // Render error state if games data failed to load in the Server Component (Keep as is)
+  // Render error state if games data failed to load in the Server Component
   if (gamesLoadError) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-600 to-indigo-800 flex items-center justify-center p-4 font-sans antialiased">
@@ -797,7 +796,8 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
                 >
                   Favorites
                 </button>
-                {/* NEW: AI Chat Button for logged-in users */}
+                {/* NEW: AI Chat Button for logged-in users - REMOVED FOR NOW */}
+                {/*
                 <button
                   onClick={() => {
                     setCurrentPageView('aiChat');
@@ -807,6 +807,7 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
                 >
                   AI Chat
                 </button>
+                */}
               </>
             ) : (
               <>
@@ -830,7 +831,8 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
                 >
                   Sign Up
                 </button>
-                {/* NEW: AI Chat Button for guest users */}
+                {/* NEW: AI Chat Button for guest users - REMOVED FOR NOW */}
+                {/*
                 <button
                   onClick={() => {
                     setCurrentPageView('aiChat');
@@ -839,13 +841,13 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
                   className="bg-white text-purple-800 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-gray-100 transition duration-200 ease-in-out text-base transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-purple-800 cursor-pointer"
                 >
                   AI Chat
-                  {/* Re-added guest request count display */}
                   {aiRequestCount < GUEST_AI_REQUEST_LIMIT && (
                     <span className="ml-2 px-2 py-1 text-xs font-semibold text-white bg-blue-500 rounded-full">
                       {GUEST_AI_REQUEST_LIMIT - aiRequestCount} left
                     </span>
                   )}
                 </button>
+                */}
               </>
             )}
           </div>
@@ -1097,7 +1099,8 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
           />
         )}
 
-        {/* NEW: Conditional Rendering of AI Chat Page */}
+        {/* NEW: Conditional Rendering of AI Chat Page - REMOVED FOR NOW */}
+        {/*
         {currentPageView === 'aiChat' && (
           <AIChatPage
             user={user}
@@ -1109,6 +1112,7 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
             onBackToHome={() => setCurrentPageView('home')}
           />
         )}
+        */}
       </div> {/* End of Main Content Area */}
 
 
