@@ -77,7 +77,7 @@ const AIChatPage = ({ user, aiRequestCount, guestLimit, setAuthMode, setShowAuth
     <div className="flex flex-col h-full bg-white rounded-xl shadow-2xl w-full max-w-full sm:max-w-xl md:max-w-2xl lg:max-w-3xl xl:max-w-4xl mx-auto transform transition-all duration-300 my-4 sm:my-8">
       <div className="flex flex-col bg-white rounded-xl shadow-2xl w-full h-[70vh] max-h-[800px] sm:max-w-xl md:max-w-2xl lg:max-w-3xl xl:max-w-4xl mx-auto"> {/* Added fixed height and max-height here */}
         <div className="flex-none p-3 sm:p-4 border-b border-gray-200 flex items-center justify-center">
-          <h2 className="text-lg sm:text-2xl font-bold text-gray-800">AI Game Chat</h2>
+          <h2 className="text-lg sm:text-2xl font-bold text-gray-800">RBXDiscover AI [BETA]</h2>
         </div>
 
         <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4">
