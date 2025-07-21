@@ -15,9 +15,11 @@ import { doc, getDoc, collection, addDoc, deleteDoc, getDocs, query, where } fro
 import AuthModal from '../components/AuthModal';
 // Import the new FavoritesPage component
 import FavoritesPage from '../components/FavoritesPage';
+// NEW: Import the new CuratedListsPage component
+import CuratedListsPage from '../components/CuratedListsPage';
 // NEW: Import the new AIChatPage component - REMOVED FOR NOW
 
-// Fisher-Yates (Knuth) shuffle algorithm (Keep this as is)
+// Fisher-Yates (Knuth) shuffle algorithm (Keep this as is - though now primarily used on server)
 const shuffleArray = (array) => {
   let currentIndex = array.length, randomIndex;
   while (currentIndex !== 0) {
@@ -251,7 +253,7 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
   // State for sidebar
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // State to manage current view ('home', 'favorites', or 'aiChat')
+  // State to manage current view ('home', 'favorites', 'curatedLists', or 'aiChat')
   const [currentPageView, setCurrentPageView] = useState('home');
 
   // State to store favorited game IDs for the current user
@@ -268,9 +270,14 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
     return 0;
   });
 
-  const [allSortedRecommendations, setAllSortedRecommendations] = useState([]);
+  // REMOVED: allSortedRecommendations state is no longer needed on the client
+  // const [allSortedRecommendations, setAllSortedRecommendations] = useState([]);
+
+  // NEW: State to store the total count of recommended games from the API
+  const [totalRecommendedGamesCount, setTotalRecommendedGamesCount] = useState(0);
+
   const [currentPage, setCurrentPage] = useState(1);
-  const GAMES_PER_PAGE = 5;
+  const GAMES_PER_PAGE = 5; // Number of games to display per page
 
   // NEW: State for welcome screen
   const [showWelcomeScreen, setShowWelcomeScreen] = useState(false);
@@ -503,21 +510,19 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('mousedown', handleClickCriticside);
     };
   }, []);
 
 
-  // Function to generate recommendations based on user input (Keep this as is, no change needed here directly)
-  const generateRecommendations = async () => {
+  // Function to generate recommendations by calling the API route
+  const generateRecommendations = async (pageToFetch = 1) => {
     setIsLoading(true);
     setErrorMessage('');
-    setRecommendations([]);
-    setRandomGameRecommendation(null);
-    setAllSortedRecommendations([]);
-    setCurrentPage(1);
+    setRandomGameRecommendation(null); // Clear random game when fetching smart recs
     setShowSuggestions(false);
 
+    // Simulate network delay for better UX
     await new Promise(resolve => setTimeout(resolve, 1500));
 
     try {
@@ -527,134 +532,113 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
         return;
       }
 
-      const lowerSearchTerm = searchTerm.toLowerCase().trim();
-      const searchedGames = gamesData.filter(game =>
-        game.name.toLowerCase().includes(lowerSearchTerm) ||
-        game.genre.toLowerCase().includes(lowerSearchTerm) ||
-        game.playStyle.toLowerCase().includes(lowerSearchTerm) ||
-        (game.theme && game.theme.toLowerCase().includes(lowerSearchTerm))
-      );
-
-      const scoredGames = searchedGames.map(game => {
-        let score = 0;
-        const gameGenres = typeof game.genre === 'string' ? game.genre.toLowerCase().split(',').map(g => g.trim()) : [];
-        const gamePlayStyles = typeof game.playStyle === 'string' ? game.playStyle.toLowerCase().split(',').map(s => s.trim()) : [];
-        const gameThemes = typeof game.theme === 'string' ? game.theme.toLowerCase().split(',').map(t => t.trim()) : [];
-
-        selectedGenres.forEach(selectedGenre => {
-          const lowerSelectedGenre = selectedGenre.toLowerCase();
-          if (gameGenres.some(g => g.includes(lowerSelectedGenre))) {
-            score += 10;
-          }
-        });
-
-        selectedPlayStyles.forEach(selectedPlayStyle => {
-          const lowerSelectedPlayStyle = selectedPlayStyle.toLowerCase();
-          if (gamePlayStyles.some(s => s.includes(lowerSelectedPlayStyle))) {
-            score += 8;
-          }
-        });
-
-        if (game.theme && lowerSearchTerm && game.theme.toLowerCase().includes(lowerSearchTerm)) {
-             score += 5;
-        }
-
-        if (score > 0 || (lowerSearchTerm && (game.name.toLowerCase().includes(lowerSearchTerm) ||
-                                              game.genre.toLowerCase().includes(lowerSearchTerm) ||
-                                              game.playStyle.toLowerCase().includes(lowerSearchTerm) ||
-                                              (game.theme && game.theme.toLowerCase().includes(lowerSearchTerm))))) {
-            score = Math.max(score, 1);
-        }
-
-        return { ...game, score, isFavorite: favoritedGameIds.includes(game.id) }; // Add isFavorite flag
+      const response = await fetch('/api/recommendations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          selectedGenres,
+          selectedPlayStyles,
+          searchTerm,
+          isRandom: false, // Not a random request
+          page: pageToFetch,
+          limit: GAMES_PER_PAGE,
+        }),
       });
 
-      const sortedGames = scoredGames.sort((a, b) => b.score - a.score);
-      const filteredSortedGames = sortedGames.filter(game => game.score > 0);
+      const result = await response.json();
 
-      const shuffledFilteredSortedGames = shuffleArray([...filteredSortedGames]);
+      if (!response.ok) {
+        throw new Error(result.errorMessage || 'Failed to fetch recommendations.');
+      }
 
-      setAllSortedRecommendations(shuffledFilteredSortedGames);
-      setRecommendations(shuffledFilteredSortedGames.slice(0, GAMES_PER_PAGE));
-      setCurrentPage(1);
-
-      if (shuffledFilteredSortedGames.length === 0) {
-        setErrorMessage("No games found matching your preferences or search term. Try different selections!");
+      if (result.errorMessage) {
+        setErrorMessage(result.errorMessage);
+        setRecommendations([]);
+        setTotalRecommendedGamesCount(0); // Reset total count on error
+        setCurrentPage(1); // Reset page on error
+      } else {
+        // Map the recommendations from the API to include isFavorite status
+        const recommendationsWithFavorites = result.recommendations.map(game => ({
+          ...game,
+          isFavorite: favoritedGameIds.includes(game.id)
+        }));
+        setRecommendations(recommendationsWithFavorites);
+        setTotalRecommendedGamesCount(result.totalCount); // Set total count from API response
+        setCurrentPage(pageToFetch);
       }
     } catch (error) {
       console.error('Error generating recommendations:', error);
-      setErrorMessage('An unexpected error occurred. Please try again.');
+      setErrorMessage(error.message || 'An unexpected error occurred. Please try again.');
+      setRecommendations([]);
+      setTotalRecommendedGamesCount(0); // Reset total count on error
+      setCurrentPage(1); // Reset page on error
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Pagination functions (Keep as is)
-  const goToNextPage = () => {
-    setIsLoading(true);
-    setErrorMessage('');
-    setRandomGameRecommendation(null);
-    setTimeout(() => {
-      const nextPage = currentPage + 1;
-      const startIndex = (nextPage - 1) * GAMES_PER_PAGE;
-      setRecommendations(allSortedRecommendations.slice(startIndex, startIndex + GAMES_PER_PAGE));
-      setCurrentPage(nextPage);
-      setIsLoading(false);
-    }, 500);
-  };
-
-  const goToPreviousPage = () => {
-    setIsLoading(true);
-    setErrorMessage('');
-    setRandomGameRecommendation(null);
-    setTimeout(() => {
-      const prevPage = currentPage - 1;
-      const startIndex = (prevPage - 1) * GAMES_PER_PAGE;
-      setRecommendations(allSortedRecommendations.slice(startIndex, startIndex + GAMES_PER_PAGE));
-      setCurrentPage(prevPage);
-      setIsLoading(false);
-    }, 500);
-  };
-
-  // Function to get a random game recommendation (Keep as is)
+  // Function to get a random game recommendation by calling the API route
   const generateRandomRecommendation = async () => {
     setIsLoading(true);
     setErrorMessage('');
-    setRecommendations([]);
-    setRandomGameRecommendation(null);
-    setAllSortedRecommendations([]);
-    setCurrentPage(1);
+    setRecommendations([]); // Clear smart recommendations when fetching random
+    // REMOVED: setAllSortedRecommendations([]); // No longer needed
+    setTotalRecommendedGamesCount(0); // Clear total count for random pick
+    setCurrentPage(1); // Reset page
     setShowSuggestions(false);
 
+    // Simulate network delay for better UX
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     try {
-      const lowerSearchTerm = searchTerm.toLowerCase().trim();
-      let gamesToPickFrom = gamesData.filter(game =>
-        game.name.toLowerCase().includes(lowerSearchTerm) ||
-        game.genre.toLowerCase().includes(lowerSearchTerm) ||
-        game.playStyle.toLowerCase().includes(lowerSearchTerm) ||
-        (game.theme && game.theme.toLowerCase().includes(lowerSearchTerm))
-      );
-
-      gamesToPickFrom = shuffleArray([...gamesToPickFrom]);
-
-      if (gamesToPickFrom.length === 0) {
-        setErrorMessage("No games found matching your search term to pick a random game.");
-        setIsLoading(false);
-        return;
-      }
-      const randomIndex = Math.floor(Math.random() * gamesToPickFrom.length);
-      setRandomGameRecommendation({
-        ...gamesToPickFrom[randomIndex],
-        isFavorite: favoritedGameIds.includes(gamesToPickFrom[randomIndex].id) // Add isFavorite flag
+      const response = await fetch('/api/recommendations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          searchTerm,
+          isRandom: true, // This is a random request
+          selectedGenres: [], // Not relevant for random, but API expects it
+          selectedPlayStyles: [], // Not relevant for random, but API expects it
+        }),
       });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.errorMessage || 'Failed to fetch random recommendation.');
+      }
+
+      if (result.errorMessage) {
+        setErrorMessage(result.errorMessage);
+        setRandomGameRecommendation(null);
+      } else {
+        // Map the random recommendation to include isFavorite status
+        const randomGameWithFavorite = result.recommendations[0] ? {
+          ...result.recommendations[0],
+          isFavorite: favoritedGameIds.includes(result.recommendations[0].id)
+        } : null;
+        setRandomGameRecommendation(randomGameWithFavorite);
+      }
     } catch (error) {
       console.error('Error generating random recommendation:', error);
-      setErrorMessage('An unexpected error occurred while picking a random game.');
+      setErrorMessage(error.message || 'An unexpected error occurred while picking a random game.');
+      setRandomGameRecommendation(null);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Pagination functions (now call generateRecommendations with new page)
+  const goToNextPage = () => {
+    generateRecommendations(currentPage + 1);
+  };
+
+  const goToPreviousPage = () => {
+    generateRecommendations(currentPage - 1);
   };
 
   // Function to clear all selected filters and search term (Keep as is)
@@ -665,7 +649,8 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
     setErrorMessage('');
     setRecommendations([]);
     setRandomGameRecommendation(null);
-    setAllSortedRecommendations([]);
+    // REMOVED: setAllSortedRecommendations([]); // No longer needed
+    setTotalRecommendedGamesCount(0); // Clear total count
     setCurrentPage(1);
     setSuggestions([]);
     setShowSuggestions(false);
@@ -708,7 +693,8 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
     );
   }
 
-  const totalPages = Math.ceil(allSortedRecommendations.length / GAMES_PER_PAGE);
+  // totalPages is now calculated based on totalRecommendedGamesCount (which comes from API)
+  const totalPages = Math.ceil(totalRecommendedGamesCount / GAMES_PER_PAGE);
 
   // Determine the color of the hamburger icon based on the current page view
   // On 'home' page, it's purple by default and white on md screens up (for dark background)
@@ -796,6 +782,16 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
                 >
                   Favorites
                 </button>
+                {/* NEW: Curated Lists Button */}
+                <button
+                  onClick={() => {
+                    setCurrentPageView('curatedLists'); // Set new page view
+                    setIsSidebarOpen(false); // Close sidebar
+                  }}
+                  className="bg-white text-purple-800 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-gray-100 transition duration-200 ease-in-out text-base transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-purple-800 cursor-pointer"
+                >
+                  Curated Lists
+                </button>
                 {/* NEW: AI Chat Button for logged-in users - REMOVED FOR NOW */}
                 {/*
                 <button
@@ -873,6 +869,7 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
       <div className={`
         ${currentPageView === 'home' ? 'bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl transform transition-all duration-300 hover:scale-[1.01]' : ''}
         ${currentPageView === 'favorites' ? 'w-full h-full max-w-2xl transform transition-all duration-300' : ''}
+        ${currentPageView === 'curatedLists' ? 'w-full h-full max-w-2xl transform transition-all duration-300' : ''}
         ${currentPageView === 'aiChat' ? 'w-full h-full transform transition-all duration-300' : ''}
       `}>
         {currentPageView === 'home' && (
@@ -884,9 +881,9 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
             </h1>
 
             <p className="text-center text-gray-600 mb-4 text-lg">
-              Discover your next favorite Roblox game! Select your preferences below or search directly.
+              Discover your next favorite Roblox game! Select your preferences below or search directly. Sign in to access favoriting and curated lists.
               <br className="hidden sm:inline" />
-              <span className="text-sm text-gray-500">Database updated weekly, last updated July 6th.</span>
+              <span className="text-sm text-gray-500">Database updated weekly.</span>
             </p>
 
             {/* How to Use Button */}
@@ -972,7 +969,7 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
 
             <div className="flex flex-col sm:flex-row gap-4 mb-8">
               <button
-                onClick={generateRecommendations}
+                onClick={() => generateRecommendations(1)} // Start from page 1
                 disabled={isLoading || (selectedGenres.length === 0 && selectedPlayStyles.length === 0 && !searchTerm.trim())}
                 className={`flex-1 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg hover:from-blue-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition duration-300 ease-in-out text-xl transform hover:scale-105 ${isLoading || (selectedGenres.length === 0 && selectedPlayStyles.length === 0 && !searchTerm.trim()) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                 aria-live="polite"
@@ -1058,7 +1055,8 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
                   />
                 ))}
               </div>
-              {allSortedRecommendations.length > GAMES_PER_PAGE && (
+              {/* Pagination controls */}
+              {totalPages > 1 && ( // Only show pagination if there's more than 1 page
                 <div className="flex justify-center items-center gap-4 mt-6">
                   <button
                     onClick={goToPreviousPage}
@@ -1095,6 +1093,15 @@ export default function RecommenderClient({ gamesData, gamesLoadError }) {
             gamesData={gamesData}
             favoritedGameIds={favoritedGameIds}
             toggleFavorite={toggleFavorite}
+            onBackToHome={() => setCurrentPageView('home')}
+          />
+        )}
+
+        {/* NEW: Conditional Rendering of Curated Lists Page */}
+        {currentPageView === 'curatedLists' && (
+          <CuratedListsPage
+            user={user}
+            gamesData={gamesData}
             onBackToHome={() => setCurrentPageView('home')}
           />
         )}
