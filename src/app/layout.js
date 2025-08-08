@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata = {
   title: "RBXDiscover",
-  description: "Find your next Roblox adventure!",
+  description: "Make the next viral Roblox game.",
 };
 
 export default function RootLayout({ children }) {
