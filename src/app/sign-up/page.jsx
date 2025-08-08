@@ -1,3 +1,4 @@
+'use client'
 import React, { useState } from 'react';
 import { AtSign, Lock } from 'lucide-react';
 import { auth } from '../../../firebase.js';

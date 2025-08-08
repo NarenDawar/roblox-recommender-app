@@ -1,3 +1,4 @@
+'use client'
 import React, { useState, useEffect } from 'react';
 import { User, Key, Trash2, Moon, Sun, Download, FileX, XCircle } from 'lucide-react';
 import { getAuth, EmailAuthProvider, reauthenticateWithCredential, updatePassword, updateEmail, deleteUser, signOut } from 'firebase/auth';

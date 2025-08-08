@@ -1,3 +1,4 @@
+'use client'
 import React from 'react';
 import { Sparkles, LogIn, UserPlus, LayoutDashboard, LogOut, Settings } from 'lucide-react';
 

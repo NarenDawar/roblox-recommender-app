@@ -1,3 +1,4 @@
+'use client'
 import React, { useState, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Sparkles, Loader2, Rocket, ThumbsUp, ThumbsDown, Lightbulb, TrendingUp } from 'lucide-react';
