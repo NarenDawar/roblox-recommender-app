@@ -1,14 +1,14 @@
 'use client'
 import React, { useState, useCallback, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Sparkles, Loader2, Rocket, ThumbsUp, ThumbsDown, Lightbulb, TrendingUp, Handshake, Code, Gauge, Type, Bot, FileText, ChevronDown } from 'lucide-react';
+import { Sparkles, Loader2, Rocket, ThumbsUp, ThumbsDown, Lightbulb, TrendingUp, Handshake, Code, Gauge, Type, Bot, FileText, ChevronDown, CheckCircle } from 'lucide-react';
 import Header from './header/page.jsx';
 import LoginPage from './login/page.jsx';
 import SignupPage from './sign-up/page.jsx';
 import Dashboard from './dashboard/page.jsx';
 import AnalyzerTool from './analyzer-tool/page.jsx';
 import SettingsPage from './settings/page.jsx';
-import { auth, initializeAuth, onAuthStateChanged, db } from '../../firebase.js';
+import { auth, onAuthStateChanged, db } from '../../firebase.js';
 
 
 // A simple component for the new landing page
@@ -54,11 +54,80 @@ const LandingPage = ({ onStartAnalysis }) => (
   
           <button
             onClick={onStartAnalysis}
-            className="px-8 py-4 bg-purple-600 text-white font-bold text-lg rounded-full shadow-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-900 transition-all duration-300 flex items-center space-x-2 mx-auto"
+            className="px-8 py-4 bg-purple-600 text-white font-bold text-lg rounded-full shadow-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-900 transition-all duration-300 flex items-center space-x-2 mx-auto cursor-pointer"
           >
             <Rocket className="h-6 w-6" />
             <span>Analyze Your Idea Now</span>
           </button>
+        </div>
+  
+        {/* Pricing Section */}
+        <div className="text-center space-y-6">
+          <h2 className="text-4xl font-extrabold text-white tracking-tight">Our Plans</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
+
+            {/* Free Plan */}
+            <div className="bg-gray-700 p-6 rounded-2xl border border-gray-600 flex flex-col">
+              <h3 className="text-2xl font-bold text-white mb-2">Free Plan</h3>
+              <p className="text-sm text-gray-400 mb-4">Perfect for getting started.</p>
+              <div className="mb-4">
+                <span className="text-4xl font-bold text-white">$0</span>
+                <span className="text-gray-400"> / month</span>
+              </div>
+              <ul className="space-y-2 text-gray-300 flex-grow">
+                <li className="flex items-center space-x-2"><CheckCircle className="h-5 w-5 text-green-400"/><span>5 analyses per month</span></li>
+                <li className="flex items-center space-x-2"><CheckCircle className="h-5 w-5 text-green-400"/><span>3 projects saved</span></li>
+                <li className="flex items-center space-x-2"><CheckCircle className="h-5 w-5 text-green-400"/><span>Core analysis features</span></li>
+              </ul>
+              <button
+                onClick={onStartAnalysis}
+                className="mt-6 w-full px-4 py-2 bg-purple-600 text-white font-bold rounded-full shadow-lg hover:bg-purple-700 transition-all duration-300 cursor-pointer"
+              >
+                Start for Free
+              </button>
+            </div>
+
+            {/* Pro Plan */}
+            <div className="bg-gray-700 p-6 rounded-2xl border border-gray-600 flex flex-col">
+              <h3 className="text-2xl font-bold text-yellow-400 mb-2">Pro Plan</h3>
+              <p className="text-sm text-gray-400 mb-4">For serious game developers.</p>
+              <div className="mb-4">
+                <span className="text-4xl font-bold text-white">$15</span>
+                <span className="text-gray-400"> / month</span>
+              </div>
+              <ul className="space-y-2 text-gray-300 flex-grow">
+                <li className="flex items-center space-x-2"><CheckCircle className="h-5 w-5 text-green-400"/><span>30 analyses per month</span></li>
+                <li className="flex items-center space-x-2"><CheckCircle className="h-5 w-5 text-green-400"/><span>20 projects saved</span></li>
+                <li className="flex items-center space-x-2"><CheckCircle className="h-5 w-5 text-green-400"/><span>Promotion Strategies</span></li>
+              </ul>
+              <button
+                onClick={() => setCurrentPage('signup')}
+                className="mt-6 w-full px-4 py-2 bg-yellow-600 text-white font-bold rounded-full shadow-lg hover:bg-yellow-700 transition-all duration-300 cursor-pointer"
+              >
+                Upgrade to Pro
+              </button>
+            </div>
+
+            {/* Enterprise Plan */}
+            <div className="bg-gray-700 p-6 rounded-2xl border border-gray-600 flex flex-col">
+              <h3 className="text-2xl font-bold text-red-400 mb-2">Enterprise</h3>
+              <p className="text-sm text-gray-400 mb-4">For teams and studios.</p>
+              <div className="mb-4">
+                <span className="text-4xl font-bold text-white">Contact Us</span>
+              </div>
+              <ul className="space-y-2 text-gray-300 flex-grow">
+                <li className="flex items-center space-x-2"><CheckCircle className="h-5 w-5 text-green-400"/><span>Unlimited analyses</span></li>
+                <li className="flex items-center space-x-2"><CheckCircle className="h-5 w-5 text-green-400"/><span>Unlimited projects</span></li>
+                <li className="flex items-center space-x-2"><CheckCircle className="h-5 w-5 text-green-400"/><span>Community server access</span></li>
+              </ul>
+              <button
+                onClick={() => setCurrentPage('signup')}
+                className="mt-6 w-full px-4 py-2 bg-red-600 text-white font-bold rounded-full shadow-lg hover:bg-red-700 transition-all duration-300 cursor-pointer"
+              >
+                Contact Us
+              </button>
+            </div>
+          </div>
         </div>
   
         {/* How It Works Section */}
@@ -139,9 +208,9 @@ const LandingPage = ({ onStartAnalysis }) => (
     const [dbInstance, setDbInstance] = useState(null);
     const [authInstance, setAuthInstance] = useState(null);
     const [isAuthReady, setIsAuthReady] = useState(false);
+    const [selectedProject, setSelectedProject] = useState(null);
   
     useEffect(() => {
-      // Initialize Firebase and set up auth listener
       // No need to call initializeAuth here anymore, it's handled in firebase.js
       setDbInstance(db);
       setAuthInstance(auth);
@@ -174,10 +243,24 @@ const LandingPage = ({ onStartAnalysis }) => (
     // New handler function to check auth state before navigating
     const handleStartAnalysis = () => {
       if (user) {
-        setCurrentPage('analyzer'); // Changed to go directly to analyzer
+        setCurrentPage('analyzer');
       } else {
         setCurrentPage('login');
       }
+    };
+
+    const onStartNewProject = () => {
+      setSelectedProject(null);
+      setIdea('');
+      setAnalysis(null);
+      setCurrentPage('analyzer');
+    };
+  
+    const onProjectSelect = (project) => {
+      setSelectedProject(project);
+      setIdea(project.idea); // Pre-fill the textarea with the selected project's idea
+      setAnalysis(project.analysis);
+      setCurrentPage('analyzer');
     };
   
     // Main UI rendering based on currentPage state
@@ -202,11 +285,14 @@ const LandingPage = ({ onStartAnalysis }) => (
               setError={setError}
               db={dbInstance}
               user={user}
+              initialAnalysis={selectedProject?.analysis}
+              initialIdea={selectedProject?.idea}
+              setCurrentPage={setCurrentPage}
             />
           );
           break;
         case 'dashboard':
-          content = <Dashboard setCurrentPage={setCurrentPage} db={dbInstance} user={user} />;
+          content = <Dashboard setCurrentPage={setCurrentPage} db={dbInstance} user={user} onProjectSelect={onProjectSelect} onStartNewProject={onStartNewProject} />;
           break;
         case 'login':
           content = <LoginPage setCurrentPage={setCurrentPage} onLoginSuccess={handleLoginSuccess} />;
@@ -235,5 +321,3 @@ const LandingPage = ({ onStartAnalysis }) => (
   }
   
   export default App;
-
-  

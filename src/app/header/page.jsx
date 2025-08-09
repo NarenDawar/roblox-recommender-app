@@ -1,4 +1,3 @@
-'use client'
 import React from 'react';
 import { Sparkles, LogIn, UserPlus, LayoutDashboard, LogOut, Settings } from 'lucide-react';
 
@@ -13,6 +12,13 @@ const Header = ({ setCurrentPage, userIsAuthenticated, onLogout }) => {
         <div className="flex items-center space-x-4">
           {userIsAuthenticated ? (
             <>
+              <button
+                onClick={() => setCurrentPage('dashboard')}
+                className="px-4 py-2 bg-gray-700 text-white rounded-full font-semibold hover:bg-purple-600 transition-colors duration-300 flex items-center space-x-2 cursor-pointer"
+              >
+                <LayoutDashboard className="h-5 w-5" />
+                <span>Dashboard</span>
+              </button>
               <button
                 onClick={() => setCurrentPage('settings')} // New 'settings' page
                 className="px-4 py-2 bg-gray-700 text-white rounded-full font-semibold hover:bg-purple-600 transition-colors duration-300 flex items-center space-x-2 cursor-pointer"
@@ -38,7 +44,7 @@ const Header = ({ setCurrentPage, userIsAuthenticated, onLogout }) => {
                 <span>Login</span>
               </button>
               <button
-                onClick={() => setCurrentPage('signup')}
+                onClick={() => setCurrentPage('sign-up')}
                 className="px-4 py-2 bg-purple-600 text-white rounded-full font-semibold hover:bg-purple-700 transition-colors duration-300 flex items-center space-x-2 cursor-pointer"
               >
                 <UserPlus className="h-5 w-5" />
