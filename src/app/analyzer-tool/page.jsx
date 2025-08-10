@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Sparkles, Loader2, Rocket, ThumbsUp, ThumbsDown, Lightbulb, TrendingUp, Megaphone, ArrowLeft, ChevronDown } from 'lucide-react';
+import { Sparkles, Loader2, Rocket, ThumbsUp, ThumbsDown, Lightbulb, TrendingUp, Megaphone, ArrowLeft, ChevronDown, Users, Activity, Scaling } from 'lucide-react';
 import { collection, addDoc } from 'firebase/firestore';
 
 
@@ -14,7 +14,10 @@ const parseAnalysis = (markdown) => {
       cons: '',
       improvements: '',
       monetization: '',
-      promotion: ''
+      promotion: '',
+      targetAudience: '',
+      trendAlignment: '',
+      comparativeAnalysis: '',
     };
 
     const lines = markdown.split('\n');
@@ -43,6 +46,15 @@ const parseAnalysis = (markdown) => {
       }
       else if (cleanLine.match(/^(\*{0,2}|#+)?\s*promotion/)) {
         currentSection = 'promotion';
+      }
+      else if (cleanLine.match(/^(\*{0,2}|#+)?\s*target/)) {
+        currentSection = 'targetAudience';
+      }
+      else if (cleanLine.match(/^(\*{0,2}|#+)?\s*trend/)) {
+        currentSection = 'trendAlignment';
+      }
+      else if (cleanLine.match(/^(\*{0,2}|#+)?\s*comparative/)) {
+        currentSection = 'comparativeAnalysis';
       }
       else if (line.trim() !== '' && currentSection) {
         sections[currentSection] += line + '\n';
@@ -125,6 +137,7 @@ const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLo
 
       if (result.choices && result.choices.length > 0) {
         const generatedAnalysis = result.choices[0].message.content;
+        console.log(generatedAnalysis);
         setAnalysis(generatedAnalysis);
         setParsedAnalysis(parseAnalysis(generatedAnalysis));
 
@@ -283,6 +296,43 @@ const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLo
           >
             <ReactMarkdown components={markdownComponents}>
               {parsedAnalysis?.promotion}
+            </ReactMarkdown>
+          </CollapsibleSection>
+
+          {/* --- ADDED "DEEPER LOOK" DIVIDER --- */}
+          <div className="flex items-center space-x-2 pt-4">
+            <div className="h-px bg-gray-600 flex-grow"></div>
+            <h2 className="text-xl font-bold text-gray-300">Deeper Look</h2>
+            <div className="h-px bg-gray-600 flex-grow"></div>
+          </div>
+
+            {/* Target Audience */}
+          <CollapsibleSection
+            icon={<Users className="h-5 w-5 text-teal-400" />}
+            title="Target Audience"
+          >
+            <ReactMarkdown components={markdownComponents}>
+              {parsedAnalysis?.targetAudience}
+            </ReactMarkdown>
+          </CollapsibleSection>
+
+          {/* Trend Alignment */}
+          <CollapsibleSection
+            icon={<Activity className="h-5 w-5 text-orange-400" />}
+            title="Trend Alignment"
+          >
+            <ReactMarkdown components={markdownComponents}>
+              {parsedAnalysis?.trendAlignment}
+            </ReactMarkdown>
+          </CollapsibleSection>
+
+          {/* Comparative Analysis */}
+          <CollapsibleSection
+            icon={<Scaling className="h-5 w-5 text-indigo-400" />}
+            title="Comparative Analysis"
+          >
+            <ReactMarkdown components={markdownComponents}>
+              {parsedAnalysis?.comparativeAnalysis}
             </ReactMarkdown>
           </CollapsibleSection>
 

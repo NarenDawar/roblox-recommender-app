@@ -2,21 +2,21 @@
 export async function POST(req) {
     try {
       const { idea } = await req.json();
-  
-      const prompt = `Analyze the following Roblox game idea. Provide a detailed, helpful, and constructive analysis in Markdown format. The analysis should include:
-  
-  **Overall Rating**: A short, catchy phrase and a numerical score out of 100 (e.g., "Highly Promising! Score: 90/100 🚀").
-  
-  **Pros**: A bulleted list highlighting the strengths.
-  
-  **Cons**: A bulleted list detailing potential weaknesses or challenges.
-  
-  **Improvements**: A bulleted list with actionable, creative suggestions.
-  
-  **Monetization Strategy**: A bulleted list with ideas for how the game could make Robux.
-  
-  Game Idea: "${idea}"`;
-  
+
+      const currentTrends = ["Build A __ , Steal A ____, & Grow a ____ Games", "'Brainrot' related content", "Anime PvP / Progression Games"];
+
+      // --- MODIFIED PROMPT ---
+      // This version removes the conflicting Markdown formatting and simply lists the criteria.
+      // The system prompt will handle the final output structure.
+      const prompt = `Analyze the following Roblox game idea based on a comprehensive set of criteria.
+
+      Your analysis should include:
+      - Core elements: An overall rating, pros, cons, and actionable improvements.
+      - Business strategy: Potential monetization and promotion strategies.
+      - Deeper analysis: A breakdown of the target audience, alignment with current Roblox trends (like ${currentTrends.join(', ')}), and a comparative analysis against 2 successful related games to identify key takeaways.
+
+      Game Idea: "${idea}"`;
+
       const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -24,13 +24,14 @@ export async function POST(req) {
           "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
         },
         body: JSON.stringify({
-          model: "gpt-5-nano",
+          model: "gpt-5-nano", // NOTE: This model name might need to be updated to a valid one like gpt-4-turbo
           messages: [
             {
               role: "system",
               content:
                 `You are an AI assistant specialized in analyzing Roblox game ideas. You provide a detailed, helpful, and constructive analysis in Markdown format.
-                You must output your response in the following exact Markdown structure:
+                You must output your response in the following exact Markdown structure.
+                **Crucially, you must place a blank line before each heading.** Each heading (e.g., **Pros**, **Cons**) must start on its own new line.
 
                 **Overall Rating**
                 Score: [number]/100
@@ -38,46 +39,50 @@ export async function POST(req) {
 
                 **Pros**
                 - Point 1
-                - Point 2
-                - Point 3
 
                 **Cons**
                 - Point 1
-                - Point 2
-                - Point 3
 
                 **Improvements**
                 - Point 1
-                - Point 2
-                - Point 3
 
                 **Monetization Strategy**
                 - Point 1
-                - Point 2
-                - Point 3
 
-                Do not add any other sections or headings. Keep exactly these five headings in this order.
+                **Promotion Strategies**
+                - Point 1
+
+                **Target Audience**
+                - Point 1
+
+                **Trend Alignment**
+                - Point 1
+
+                **Comparative Analysis**
+                - Point 1
+
+                Do not add any other sections or headings. Keep exactly these nine headings in this order.
                 `,
             },
             { role: "user", content: prompt },
           ],
-          temperature: 1,
+          temperature: 1, 
         }),
       });
-  
+
       const data = await response.json();
-  
+
       if (data.error) {
         return new Response(JSON.stringify({ error: data.error.message }), {
           status: 400,
         });
       }
-  
+
       return new Response(JSON.stringify(data), { status: 200 });
-    } catch (error) {
+    } catch (error)
+    {
       return new Response(JSON.stringify({ error: error.message }), {
         status: 500,
       });
     }
-  }
-  
+}
