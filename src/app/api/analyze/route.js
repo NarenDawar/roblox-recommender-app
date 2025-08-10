@@ -11,8 +11,9 @@ export async function POST(req) {
       const prompt = `Analyze the following Roblox game idea based on a comprehensive set of criteria.
 
       Your analysis should include:
+      - Core metrics: Scores (out of 10) for Virality Potential, Originality, and Monetizability, each with a 1 sentence justification.
       - Core elements: An overall rating, pros, cons, and actionable improvements.
-      - Business strategy: Potential monetization and promotion strategies.
+      - Business strategy: Potential monetization and promotion strategies (consider where they could find their ideal audience).
       - Deeper analysis: A breakdown of the target audience, alignment with current Roblox trends (like ${currentTrends.join(', ')}), and a comparative analysis against 2 successful related games to identify key takeaways.
 
       Game Idea: "${idea}"`;
@@ -33,8 +34,16 @@ export async function POST(req) {
                 You must output your response in the following exact Markdown structure.
                 **Crucially, you must place a blank line before each heading.** Each heading (e.g., **Pros**, **Cons**) must start on its own new line.
 
-                **Overall Rating**
-                Score: [number]/100
+                **Virality Potential**
+                Score: [number]/10
+                [Short explanation]
+
+                **Originality**
+                Score: [number]/10
+                [Short explanation]
+
+                **Monetizability**
+                Score: [number]/10
                 [Short explanation]
 
                 **Pros**

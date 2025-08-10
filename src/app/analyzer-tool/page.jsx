@@ -6,10 +6,13 @@ import { Sparkles, Loader2, Rocket, ThumbsUp, ThumbsDown, Lightbulb, TrendingUp,
 import { collection, addDoc } from 'firebase/firestore';
 
 
-// Helper function to parse AI's markdown response robustly
+// --- MODIFIED PARSER ---
+// Helper function to parse the AI's new markdown structure with three scores.
 const parseAnalysis = (markdown) => {
     const sections = {
-      overallRating: '',
+      viralityPotential: '',
+      originality: '',
+      monetizability: '',
       pros: '',
       cons: '',
       improvements: '',
@@ -26,11 +29,12 @@ const parseAnalysis = (markdown) => {
     for (const line of lines) {
       const cleanLine = line.trim().toLowerCase();
 
-      if (cleanLine.match(/overall\s*rating/)) {
-        currentSection = 'overallRating';
-        // Extract any score from the same line
-        const scoreMatch = line.match(/\d+\/100/);
-        if (scoreMatch) sections.overallRating = line; // Capture the full line with score
+      if (cleanLine.match(/virality\s*potential/)) {
+        currentSection = 'viralityPotential';
+      } else if (cleanLine.match(/^(\*{0,2}|#+)?\s*originality/)) {
+        currentSection = 'originality';
+      } else if (cleanLine.match(/^(\*{0,2}|#+)?\s*monetizability/)) {
+        currentSection = 'monetizability';
       }
       else if (cleanLine.match(/^(\*{0,2}|#+)?\s*pros/)) {
         currentSection = 'pros';
@@ -59,6 +63,21 @@ const parseAnalysis = (markdown) => {
       else if (line.trim() !== '' && currentSection) {
         sections[currentSection] += line + '\n';
       }
+    }
+    // Add the score to each section for easier access later
+    for (const key in sections) {
+        if (['viralityPotential', 'originality', 'monetizability'].includes(key)) {
+            const scoreMatch = sections[key].match(/Score:\s*(\d+)\/10/);
+            if (scoreMatch) {
+              sections[key] = {
+                text: sections[key].replace(/Score:\s*\d+\/10/, '').trim(),
+                score: scoreMatch[1],
+                fullScore: scoreMatch[0].replace('Score: ', '')
+              };
+            } else {
+               sections[key] = { text: sections[key], score: null, fullScore: 'N/A' };
+            }
+        }
     }
 
     return sections;
@@ -97,12 +116,12 @@ const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLo
   const [parsedAnalysis, setParsedAnalysis] = useState(null);
   const [isContentVisible, setIsContentVisible] = useState(true);
 
+  // --- MODIFIED SCORE COLOR LOGIC ---
+  // Adjusted for a 0-10 scale.
   const getScoreColor = (score) => {
-    const numericScoreMatch = score?.match(/\d+/)?.[0];
-    const numericScore = parseInt(numericScoreMatch, 10);
-    if (isNaN(numericScore)) return 'text-gray-400';
-    if (numericScore >= 80) return 'text-green-400';
-    if (numericScore >= 50) return 'text-yellow-400';
+    if (score === null || isNaN(score)) return 'text-gray-400';
+    if (score >= 8) return 'text-green-400';
+    if (score >= 5) return 'text-yellow-400';
     return 'text-red-400';
   };
 
@@ -119,6 +138,7 @@ const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLo
     setIsContentVisible(false);
     setIsLoading(true);
     setAnalysis(null);
+    setParsedAnalysis(null); // Clear previous parsed data
     setError(null);
 
     try {
@@ -139,9 +159,8 @@ const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLo
         const generatedAnalysis = result.choices[0].message.content;
         console.log(generatedAnalysis);
         setAnalysis(generatedAnalysis);
-        setParsedAnalysis(parseAnalysis(generatedAnalysis));
+        setParsedAnalysis(parseAnalysis(generatedAnalysis)); // Parse the new data
 
-        // Save to Firestore if logged in
         if (db && user) {
           const projectsRef = collection(db, `artifacts/${appId}/users/${user.uid}/projects`);
           await addDoc(projectsRef, {
@@ -159,19 +178,32 @@ const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLo
     } finally {
       setIsLoading(false);
       setIsContentVisible(true);
-      setIdea(''); // Reset the idea input after a successful analysis
+      setIdea('');
     }
-  }, [idea, setAnalysis, setIsLoading, setError, setIdea]);
+  }, [idea, setAnalysis, setIsLoading, setError, setIdea, db, user, appId]);
 
-  // Reusable components object for Markdown styling
   const markdownComponents = {
     ul: ({node, ...props}) => <ul {...props} className="list-none space-y-1" />,
     li: ({node, ...props}) => <li {...props} className="before:content-['-'] before:text-gray-300 before:mr-2 text-gray-300" />,
   };
 
+  // Score Card Component for reusability
+  const ScoreCard = ({ title, scoreData }) => (
+    <div className="bg-gray-700 p-6 rounded-2xl border border-gray-600 flex flex-col justify-between">
+      <div>
+        <h3 className="text-xl font-bold text-white">{title}</h3>
+        <p className="text-gray-300 mt-2 text-sm">{scoreData?.text}</p>
+      </div>
+      <span className={`text-4xl font-extrabold text-right mt-4 ${getScoreColor(scoreData?.score)}`}>
+        {scoreData?.score}/10
+      </span>
+    </div>
+  );
+
   return (
     <div className="w-full max-w-3xl my-8 mx-auto p-6 bg-gray-800 rounded-3xl shadow-xl border border-gray-700 animate-fadeIn">
-      <div className="flex justify-between items-center mb-4">
+       {/* Header */}
+       <div className="flex justify-between items-center mb-4">
         <button
           onClick={() => setCurrentPage('dashboard')}
           className="p-2 text-white rounded-full hover:bg-gray-700 transition-colors duration-300 cursor-pointer"
@@ -182,20 +214,21 @@ const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLo
           <Sparkles className="h-8 w-8 text-yellow-400" />
           <h1 className="text-4xl font-extrabold text-white tracking-tight">Roblox Idea Analyzer</h1>
         </div>
-        <div className="w-10"></div> {/* Spacer to balance the layout */}
+        <div className="w-10"></div>
       </div>
-
       <p className="text-center text-gray-400 mb-6 max-w-prose mx-auto">
         Enter your Roblox game idea below, and our AI will provide a detailed,
         constructive analysis to help you make it a hit!
       </p>
 
+      {/* Loading State */}
       {isLoading ? (
         <div className={`flex flex-col items-center justify-center h-96 transition-opacity duration-500 ${isContentVisible ? 'opacity-100' : 'opacity-0'}`}>
           <Loader2 className="h-12 w-12 text-purple-500 animate-spin" />
           <p className="mt-4 text-xl font-bold text-purple-400 animate-pulse">Analyzing...</p>
         </div>
       ) : (
+         // Input Form
         <div className={`transition-opacity duration-500 ${isContentVisible ? 'opacity-100' : 'opacity-0'}`}>
           <form onSubmit={handleSubmit} className="space-y-4">
             <textarea
@@ -219,6 +252,7 @@ const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLo
         </div>
       )}
 
+      {/* Error Message */}
       {error && (
         <div className="mt-8 p-4 bg-red-800 text-white rounded-2xl border border-red-700">
           <p className="font-semibold">Error:</p>
@@ -226,25 +260,21 @@ const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLo
         </div>
       )}
 
-      {analysis && (
+      {/* Analysis Results */}
+      {analysis && parsedAnalysis && (
         <div className="mt-8 space-y-6">
           <div className="flex items-center space-x-2 mb-4">
             <Sparkles className="h-6 w-6 text-yellow-400" />
             <h2 className="text-2xl font-bold text-white">AI Analysis</h2>
           </div>
 
-          {/* Overall Score Section */}
-          <div className="bg-gray-700 p-6 rounded-2xl border border-gray-600">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xl font-bold text-white">Overall Rating</h3>
-              <span className={`text-4xl font-extrabold ${getScoreColor(parsedAnalysis?.overallRating?.match(/\d+/)?.[0])}`}>
-                {parsedAnalysis?.overallRating?.match(/\d+\/100/)}
-              </span>
-            </div>
-            <p className="text-gray-300 mt-2">
-              {parsedAnalysis?.overallRating?.replace(/Score: \d+\/100/, '').trim()}
-            </p>
+          {/* --- NEW SCORE CARDS SECTION --- */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <ScoreCard title="Virality Potential" scoreData={parsedAnalysis.viralityPotential} />
+            <ScoreCard title="Originality" scoreData={parsedAnalysis.originality} />
+            <ScoreCard title="Monetizability" scoreData={parsedAnalysis.monetizability} />
           </div>
+
 
           {/* Pros */}
           <CollapsibleSection
@@ -289,7 +319,7 @@ const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLo
           </CollapsibleSection>
 
 
-          {/* Promotion Strategies (New Pro Tier Feature) */}
+          {/* Promotion Strategies */}
           <CollapsibleSection
             icon={<Megaphone className="h-5 w-5 text-purple-400" />}
             title="Promotion Strategies"
@@ -299,14 +329,14 @@ const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLo
             </ReactMarkdown>
           </CollapsibleSection>
 
-          {/* --- ADDED "DEEPER LOOK" DIVIDER --- */}
+          {/* Deeper Look Divider */}
           <div className="flex items-center space-x-2 pt-4">
             <div className="h-px bg-gray-600 flex-grow"></div>
             <h2 className="text-xl font-bold text-gray-300">Deeper Look</h2>
             <div className="h-px bg-gray-600 flex-grow"></div>
           </div>
 
-            {/* Target Audience */}
+          {/* Target Audience */}
           <CollapsibleSection
             icon={<Users className="h-5 w-5 text-teal-400" />}
             title="Target Audience"
