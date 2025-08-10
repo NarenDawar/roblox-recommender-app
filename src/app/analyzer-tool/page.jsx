@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Sparkles, Loader2, Rocket, ThumbsUp, ThumbsDown, Lightbulb, TrendingUp, Megaphone, ArrowLeft } from 'lucide-react';
+import { Sparkles, Loader2, Rocket, ThumbsUp, ThumbsDown, Lightbulb, TrendingUp, Megaphone, ArrowLeft, ChevronDown } from 'lucide-react';
 import { collection, addDoc } from 'firebase/firestore';
 
 
@@ -16,41 +16,69 @@ const parseAnalysis = (markdown) => {
       monetization: '',
       promotion: ''
     };
-  
+
     const lines = markdown.split('\n');
     let currentSection = '';
-  
+
     for (const line of lines) {
       const cleanLine = line.trim().toLowerCase();
-  
+
       if (cleanLine.match(/overall\s*rating/)) {
         currentSection = 'overallRating';
         // Extract any score from the same line
         const scoreMatch = line.match(/\d+\/100/);
         if (scoreMatch) sections.overallRating = line; // Capture the full line with score
-      } 
+      }
       else if (cleanLine.match(/^(\*{0,2}|#+)?\s*pros/)) {
         currentSection = 'pros';
-      } 
+      }
       else if (cleanLine.match(/^(\*{0,2}|#+)?\s*cons/)) {
         currentSection = 'cons';
-      } 
+      }
       else if (cleanLine.match(/^(\*{0,2}|#+)?\s*improvements/)) {
         currentSection = 'improvements';
-      } 
+      }
       else if (cleanLine.match(/^(\*{0,2}|#+)?\s*monetization/)) {
         currentSection = 'monetization';
       }
       else if (cleanLine.match(/^(\*{0,2}|#+)?\s*promotion/)) {
         currentSection = 'promotion';
-      } 
+      }
       else if (line.trim() !== '' && currentSection) {
         sections[currentSection] += line + '\n';
       }
     }
-  
+
     return sections;
 };
+
+// Collapsible Section Component
+const CollapsibleSection = ({ icon, title, children }) => {
+  const [isOpen, setIsOpen] = useState(true);
+
+  return (
+    <div className="bg-gray-700 rounded-2xl border border-gray-600">
+      <button
+        className="w-full flex items-center justify-between p-6 cursor-pointer"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <h3 className="text-xl font-bold text-white flex items-center space-x-2">
+          {icon}
+          <span>{title}</span>
+        </h3>
+        <ChevronDown
+          className={`h-6 w-6 text-gray-400 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}
+        />
+      </button>
+      {isOpen && (
+        <div className="px-6 pb-6 prose prose-invert max-w-none">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+};
+
 
 const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLoading, error, setError, db, user, initialIdea, initialAnalysis, setCurrentPage }) => {
   const [appId] = useState('roblox-analyzer'); // Static app ID
@@ -143,7 +171,7 @@ const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLo
         </div>
         <div className="w-10"></div> {/* Spacer to balance the layout */}
       </div>
-      
+
       <p className="text-center text-gray-400 mb-6 max-w-prose mx-auto">
         Enter your Roblox game idea below, and our AI will provide a detailed,
         constructive analysis to help you make it a hit!
@@ -206,69 +234,58 @@ const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLo
           </div>
 
           {/* Pros */}
-          <div className="bg-gray-700 p-6 rounded-2xl border border-gray-600">
-            <h3 className="text-xl font-bold text-white flex items-center space-x-2 mb-4">
-              <ThumbsUp className="h-5 w-5 text-green-400" />
-              <span>Pros</span>
-            </h3>
-            <div className="prose prose-invert max-w-none">
-              <ReactMarkdown components={markdownComponents}>
-                {parsedAnalysis?.pros}
-              </ReactMarkdown>
-            </div>
-          </div>
+          <CollapsibleSection
+            icon={<ThumbsUp className="h-5 w-5 text-green-400" />}
+            title="Pros"
+          >
+            <ReactMarkdown components={markdownComponents}>
+              {parsedAnalysis?.pros}
+            </ReactMarkdown>
+          </CollapsibleSection>
+
 
           {/* Cons */}
-          <div className="bg-gray-700 p-6 rounded-2xl border border-gray-600">
-            <h3 className="text-xl font-bold text-white flex items-center space-x-2 mb-4">
-              <ThumbsDown className="h-5 w-5 text-red-400" />
-              <span>Cons</span>
-            </h3>
-            <div className="prose prose-invert max-w-none">
-              <ReactMarkdown components={markdownComponents}>
-                {parsedAnalysis?.cons}
-              </ReactMarkdown>
-            </div>
-          </div>
+          <CollapsibleSection
+            icon={<ThumbsDown className="h-5 w-5 text-red-400" />}
+            title="Cons"
+          >
+            <ReactMarkdown components={markdownComponents}>
+              {parsedAnalysis?.cons}
+            </ReactMarkdown>
+          </CollapsibleSection>
+
 
           {/* Improvements */}
-          <div className="bg-gray-700 p-6 rounded-2xl border border-gray-600">
-            <h3 className="text-xl font-bold text-white flex items-center space-x-2 mb-4">
-              <Lightbulb className="h-5 w-5 text-blue-400" />
-              <span>Improvements</span>
-            </h3>
-            <div className="prose prose-invert max-w-none">
-              <ReactMarkdown components={markdownComponents}>
-                {parsedAnalysis?.improvements}
-              </ReactMarkdown>
-            </div>
-          </div>
+          <CollapsibleSection
+            icon={<Lightbulb className="h-5 w-5 text-blue-400" />}
+            title="Improvements"
+          >
+            <ReactMarkdown components={markdownComponents}>
+              {parsedAnalysis?.improvements}
+            </ReactMarkdown>
+          </CollapsibleSection>
 
           {/* Monetization */}
-          <div className="bg-gray-700 p-6 rounded-2xl border border-gray-600">
-            <h3 className="text-xl font-bold text-white flex items-center space-x-2 mb-4">
-              <TrendingUp className="h-5 w-5 text-yellow-400" />
-              <span>Monetization Strategy</span>
-            </h3>
-            <div className="prose prose-invert max-w-none">
-              <ReactMarkdown components={markdownComponents}>
-                {parsedAnalysis?.monetization}
-              </ReactMarkdown>
-            </div>
-          </div>
+          <CollapsibleSection
+            icon={<TrendingUp className="h-5 w-5 text-yellow-400" />}
+            title="Monetization Strategy"
+          >
+            <ReactMarkdown components={markdownComponents}>
+              {parsedAnalysis?.monetization}
+            </ReactMarkdown>
+          </CollapsibleSection>
+
 
           {/* Promotion Strategies (New Pro Tier Feature) */}
-          <div className="bg-gray-700 p-6 rounded-2xl border border-gray-600">
-            <h3 className="text-xl font-bold text-white flex items-center space-x-2 mb-4">
-              <Megaphone className="h-5 w-5 text-purple-400" />
-              <span>Promotion Strategies</span>
-            </h3>
-            <div className="prose prose-invert max-w-none">
-              <ReactMarkdown components={markdownComponents}>
-                {parsedAnalysis?.promotion}
-              </ReactMarkdown>
-            </div>
-          </div>
+          <CollapsibleSection
+            icon={<Megaphone className="h-5 w-5 text-purple-400" />}
+            title="Promotion Strategies"
+          >
+            <ReactMarkdown components={markdownComponents}>
+              {parsedAnalysis?.promotion}
+            </ReactMarkdown>
+          </CollapsibleSection>
+
         </div>
       )}
     </div>
