@@ -12,7 +12,7 @@ import { auth, onAuthStateChanged, db } from '../../firebase.js';
 
 
 // A simple component for the new landing page
-const LandingPage = ({ onStartAnalysis }) => (
+const LandingPage = ({ onStartAnalysis, setCurrentPage }) => (
     <div className="flex flex-col items-center justify-center min-h-screen p-4 text-gray-200 text-center bg-gray-900 animate-fadeIn">
       <div className="w-full max-w-4xl p-8 bg-gray-800 rounded-3xl shadow-2xl border border-gray-700 space-y-12">
         {/* Hero Section */}
@@ -270,8 +270,8 @@ const LandingPage = ({ onStartAnalysis }) => (
     } else {
       switch (currentPage) {
         case 'landing':
-          content = <LandingPage onStartAnalysis={handleStartAnalysis} />;
-          break;
+        content = <LandingPage onStartAnalysis={handleStartAnalysis} setCurrentPage={setCurrentPage} />;
+        break;
         case 'analyzer':
           content = (
             <AnalyzerTool

@@ -44,7 +44,7 @@ const Header = ({ setCurrentPage, userIsAuthenticated, onLogout }) => {
                 <span>Login</span>
               </button>
               <button
-                onClick={() => setCurrentPage('sign-up')}
+                onClick={() => setCurrentPage('signup')}
                 className="px-4 py-2 bg-purple-600 text-white rounded-full font-semibold hover:bg-purple-700 transition-colors duration-300 flex items-center space-x-2 cursor-pointer"
               >
                 <UserPlus className="h-5 w-5" />

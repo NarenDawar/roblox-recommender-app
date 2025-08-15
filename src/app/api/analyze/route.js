@@ -10,13 +10,11 @@ export async function POST(req) {
       // The system prompt will handle the final output structure.
       const prompt = `Analyze the following Roblox game idea based on a comprehensive set of criteria.
 
-      Your analysis should include:
+      Your analysis MUST include:
       - Core metrics: Scores (out of 10) for Virality Potential, Originality, and Monetizability, each with a 1 sentence justification.
-      - Core elements: An overall rating, pros, cons, and actionable improvements.
+      - Core elements: Pros, cons, and actionable improvements.
       - Business strategy: Potential monetization and promotion strategies (consider where they could find their ideal audience).
-      - Deeper analysis: A breakdown of the target audience, alignment with current Roblox trends (like ${currentTrends.join(', ')}), and a comparative analysis against 2 successful related games to identify key takeaways.
-
-      Game Idea: "${idea}"`;
+      - Deeper analysis: A breakdown of the target audience, alignment with current Roblox trends (like ${currentTrends.join(', ')}), a comparative analysis against 2 successful related games to identify key takeaways, and design ideas for game thumbnail/icon, title, and pictures.     Game Idea: "${idea}"`;
 
       const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
@@ -31,7 +29,7 @@ export async function POST(req) {
               role: "system",
               content:
                 `You are an AI assistant specialized in analyzing Roblox game ideas. You provide a detailed, helpful, and constructive analysis in Markdown format.
-                You must output your response in the following exact Markdown structure.
+                You must output your response in the following EXACT Markdown structure.
                 **Crucially, you must place a blank line before each heading.** Each heading (e.g., **Pros**, **Cons**) must start on its own new line.
 
                 **Virality Potential**
@@ -70,7 +68,10 @@ export async function POST(req) {
                 **Comparative Analysis**
                 - Point 1
 
-                Do not add any other sections or headings. Keep exactly these nine headings in this order.
+                **Creative Assets**
+                - Point 1
+
+                Do not add any other sections or headings. Keep exactly these twelve headings in this order.
                 `,
             },
             { role: "user", content: prompt },
