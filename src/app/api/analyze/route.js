@@ -1,21 +1,70 @@
-// app/api/analyze/route.js
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+
+// Initialize Firebase Admin SDK
+if (!getApps().length) {
+  initializeApp();
+}
+
+const db = getFirestore();
+const auth = getAuth();
+
+const PLAN_LIMITS = {
+  free: 5,
+  pro: 50,
+};
+
 export async function POST(req) {
     try {
+      // --- SECURITY & USAGE CHECK ---
+      const authorization = req.headers.get('authorization');
+      if (!authorization?.startsWith('Bearer ')) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+      }
+
+      const token = authorization.split('Bearer ')[1];
+      const { uid } = await auth.verifyIdToken(token);
+      
+      const userRef = db.collection('users').doc(uid);
+      const userDoc = await userRef.get();
+
+      if (!userDoc.exists) {
+        return new Response(JSON.stringify({ error: 'User not found.' }), { status: 404 });
+      }
+
+      const userData = userDoc.data();
+      const userTier = userData.tier || 'free';
+      let analysisCount = userData.analysisCount || 0;
+      const usageResetDate = userData.usageResetDate?.toDate();
+      const monthlyLimit = PLAN_LIMITS[userTier] || 5;
+
+      // Check if the usage period has expired
+      if (usageResetDate && new Date() > usageResetDate) {
+        analysisCount = 0; // Reset the count
+        const newResetDate = new Date();
+        newResetDate.setMonth(newResetDate.getMonth() + 1);
+        await userRef.update({ analysisCount: 0, usageResetDate: newResetDate });
+      }
+
+      // Enforce the limit
+      if (analysisCount >= monthlyLimit) {
+        return new Response(JSON.stringify({ error: 'Monthly analysis limit reached.' }), { status: 429 });
+      }
+      // --- END CHECK ---
+
       const { idea } = await req.json();
-
       const currentTrends = ["Build A __ , Steal A ____, & Grow a ____ Games", "'Brainrot' related content", "Anime PvP / Progression Games"];
-
-      // --- MODIFIED PROMPT ---
-      // This version removes the conflicting Markdown formatting and simply lists the criteria.
-      // The system prompt will handle the final output structure.
       const prompt = `Analyze the following Roblox game idea based on a comprehensive set of criteria.
 
       Your analysis MUST include:
       - Core metrics: Scores (out of 10) for Virality Potential, Originality, and Monetizability, each with a 1 sentence justification.
       - Core elements: Pros, cons, and actionable improvements.
       - Business strategy: Potential monetization and promotion strategies (consider where they could find their ideal audience).
-      - Deeper analysis: A breakdown of the target audience, alignment with current Roblox trends (like ${currentTrends.join(', ')}), a comparative analysis against 2 successful related games to identify key takeaways, and design ideas for game thumbnail/icon, title, and pictures.     Game Idea: "${idea}"`;
+      - Deeper analysis: A breakdown of the target audience, alignment with current Roblox trends (like ${currentTrends.join(', ')}), a comparative analysis against 2 successful related games to identify key takeaways, and design ideas for game thumbnail/icon, title, and pictures.
+       Game Idea: "${idea}"`; // Your full prompt here
 
+      // Call OpenAI API (omitted for brevity)
       const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -79,20 +128,27 @@ export async function POST(req) {
           temperature: 1, 
         }),
       });
-
       const data = await response.json();
 
       if (data.error) {
-        return new Response(JSON.stringify({ error: data.error.message }), {
-          status: 400,
-        });
+        return new Response(JSON.stringify({ error: data.error.message }), { status: 400 });
       }
 
-      return new Response(JSON.stringify(data), { status: 200 });
-    } catch (error)
-    {
-      return new Response(JSON.stringify({ error: error.message }), {
-        status: 500,
+      // --- INCREMENT USAGE COUNT ---
+      // If the API call was successful, increment the user's count
+      const newResetDate = new Date();
+      newResetDate.setMonth(newResetDate.getMonth() + 1);
+      
+      await userRef.update({
+        analysisCount: FieldValue.increment(1),
+        // Set the reset date on the first analysis of the period
+        ...(analysisCount === 0 && { usageResetDate: newResetDate })
       });
+
+      return new Response(JSON.stringify(data), { status: 200 });
+
+    } catch (error) {
+      console.error("API Error:", error);
+      return new Response(JSON.stringify({ error: 'An internal server error occurred.' }), { status: 500 });
     }
 }

@@ -1,8 +1,9 @@
 'use client'
 import React, { useState } from 'react';
 import { AtSign, Lock } from 'lucide-react';
-import { auth } from '../../../firebase.js';
+import { auth, db } from '../../../firebase.js'; // Import db
 import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore'; // Import Firestore functions
 
 const SignupPage = ({ setCurrentPage }) => {
   const [email, setEmail] = useState('');
@@ -18,12 +19,23 @@ const SignupPage = ({ setCurrentPage }) => {
       return;
     }
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
-      console.log('Sign Up successful!');
-      setCurrentPage('login');
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      // --- CREATE USER DOCUMENT IN FIRESTORE ---
+      const userDocRef = doc(db, 'users', user.uid);
+      await setDoc(userDocRef, {
+        email: user.email,
+        tier: 'free',
+        analysisCount: 0,
+        usageResetDate: null,
+      });
+      // --- END ---
+
+      console.log('Sign Up and user document creation successful!');
+      setCurrentPage('login'); // Redirect to login after successful signup
     } catch (error) {
       console.error('Sign Up failed:', error.message);
-      // Firebase errors often provide codes that can be used for more specific messages
       if (error.code === 'auth/email-already-in-use') {
         setSignupError('That email address is already in use. Please log in or use a different email.');
       } else {

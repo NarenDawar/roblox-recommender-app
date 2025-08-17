@@ -42,4 +42,4 @@ next-env.d.ts
 
 #custom
 /utility/firebase-upload.js
-/utility/serviceAccountKey.json
+/serviceAccountKey.json
