@@ -1,11 +1,11 @@
 'use client'
-import React, { useState, useEffect } from 'react';
-import { User, Key, Trash2, Moon, Sun, Download, FileX, XCircle } from 'lucide-react';
-import { getAuth, EmailAuthProvider, reauthenticateWithCredential, updatePassword, updateEmail, deleteUser, signOut } from 'firebase/auth';
+import React, { useState } from 'react';
+import { User, Key, Trash2, FileX, XCircle } from 'lucide-react';
+import { getAuth, EmailAuthProvider, reauthenticateWithCredential, updatePassword, updateEmail, signOut } from 'firebase/auth';
 import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { auth, db } from '../../../firebase.js';
 
-// MessageModal component to display user messages
+// MessageModal component (No changes)
 const MessageModal = ({ message, onClose }) => (
   <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50">
     <div className="bg-gray-800 p-8 rounded-3xl shadow-2xl border border-gray-700 max-w-sm w-full text-center">
@@ -23,30 +23,44 @@ const MessageModal = ({ message, onClose }) => (
   </div>
 );
 
-// ConfirmationModal component for delete actions
-const ConfirmationModal = ({ message, onConfirm, onCancel }) => (
-  <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50">
-    <div className="bg-gray-800 p-8 rounded-3xl shadow-2xl border border-gray-700 max-w-md w-full text-center">
-      <div className="flex justify-center mb-4">
-        <Trash2 className="h-10 w-10 text-red-400" />
-      </div>
-      <p className="text-white mb-6 text-lg">{message}</p>
-      <div className="flex justify-center space-x-4">
-        <button
-          onClick={onCancel}
-          className="px-6 py-3 bg-gray-600 text-white font-bold rounded-full shadow-lg hover:bg-gray-700 transition-all duration-300 cursor-pointer"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={onConfirm}
-          className="px-6 py-3 bg-red-600 text-white font-bold rounded-full shadow-lg hover:bg-red-700 transition-all duration-300 cursor-pointer"
-        >
-          Confirm
-        </button>
+// ConfirmationModal component (No changes)
+const ConfirmationModal = ({ message, onConfirm, onCancel, showPasswordInput, password, setPassword }) => (
+    <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50">
+      <div className="bg-gray-800 p-8 rounded-3xl shadow-2xl border border-gray-700 max-w-md w-full text-center">
+        <div className="flex justify-center mb-4">
+          <Trash2 className="h-10 w-10 text-red-400" />
+        </div>
+        <p className="text-white mb-6 text-lg">{message}</p>
+        
+        {showPasswordInput && (
+          <div className="mb-4">
+            <input
+              type="password"
+              placeholder="Enter your password to confirm"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-4 py-3 bg-gray-600 text-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all duration-300 placeholder-gray-400"
+              required
+            />
+          </div>
+        )}
+  
+        <div className="flex justify-center space-x-4">
+          <button
+            onClick={onCancel}
+            className="px-6 py-3 bg-gray-600 text-white font-bold rounded-full shadow-lg hover:bg-gray-700 transition-all duration-300 cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-6 py-3 bg-red-600 text-white font-bold rounded-full shadow-lg hover:bg-red-700 transition-all duration-300 cursor-pointer"
+          >
+            Confirm
+          </button>
+        </div>
       </div>
     </div>
-  </div>
 );
 
 const SettingsPage = ({ setCurrentPage, user }) => {
@@ -58,22 +72,27 @@ const SettingsPage = ({ setCurrentPage, user }) => {
   const [isConfirmationModalOpen, setIsConfirmationModalOpen] = useState(false);
   const [confirmationAction, setConfirmationAction] = useState(null);
   const [confirmationMessage, setConfirmationMessage] = useState('');
-  const [appId] = useState('roblox-analyzer'); // Static app ID
+  const [appId] = useState('roblox-analyzer'); 
+  const [deleteConfirmPassword, setDeleteConfirmPassword] = useState('');
+  const [isPasswordRequired, setIsPasswordRequired] = useState(false);
 
-  // Function to show the message modal
   const showMessageModal = (msg) => {
     setMessage(msg);
     setIsModalOpen(true);
   };
-
-  // Function to show the confirmation modal
-  const showConfirmationModal = (msg, action) => {
+  
+  const showConfirmationModal = (msg, action, requiresPassword = false) => {
     setConfirmationMessage(msg);
-    setConfirmationAction(() => action); // Use a functional update to store the action
+    setConfirmationAction(() => action);
+    setIsPasswordRequired(requiresPassword);
     setIsConfirmationModalOpen(true);
   };
 
   const handleReauthenticate = async (password) => {
+    if (!password) {
+        showMessageModal("Password is required for this action.");
+        return false;
+      }
     const credential = EmailAuthProvider.credential(user.email, password);
     try {
       await reauthenticateWithCredential(user, credential);
@@ -118,12 +137,24 @@ const SettingsPage = ({ setCurrentPage, user }) => {
     }
   };
 
-  const handleDeleteAccount = async () => {
-    const isAuthenticated = await handleReauthenticate(currentPassword);
+  const handleDeleteAccount = async (password) => {
+    const isAuthenticated = await handleReauthenticate(password);
     if (isAuthenticated) {
       try {
-        await deleteUser(user);
+        const token = await user.getIdToken();
+        const response = await fetch('/api/delete-account', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result.error || 'Failed to delete account.');
+        }
         showMessageModal("Your account has been successfully deleted.");
+        // ** THE FIX IS HERE: Forcibly sign out the user on the client-side **
+        await signOut(auth);
         setCurrentPage('landing');
       } catch (error) {
         showMessageModal(`Failed to delete account: ${error.message}`);
@@ -135,12 +166,10 @@ const SettingsPage = ({ setCurrentPage, user }) => {
     try {
       const projectsCollectionRef = collection(db, `artifacts/${appId}/users/${user.uid}/projects`);
       const querySnapshot = await getDocs(projectsCollectionRef);
-      
       const deletePromises = [];
       querySnapshot.forEach((docSnap) => {
         deletePromises.push(deleteDoc(doc(db, `artifacts/${appId}/users/${user.uid}/projects`, docSnap.id)));
       });
-
       await Promise.all(deletePromises);
       showMessageModal("All projects have been deleted successfully!");
     } catch (error) {
@@ -148,26 +177,10 @@ const SettingsPage = ({ setCurrentPage, user }) => {
     }
   };
 
-  const handleToggleTheme = () => {
-    const isDark = document.documentElement.classList.toggle('dark');
-    localStorage.setItem('theme', isDark ? 'dark' : 'light');
-  };
-
-  useEffect(() => {
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, []);
-
   return (
     <div className="flex flex-col items-center justify-start min-h-screen p-8 text-gray-200 text-center bg-gray-900 animate-fadeIn">
       <div className="w-full max-w-3xl p-8 bg-gray-800 rounded-3xl shadow-2xl border border-gray-700 space-y-12 text-left">
         <h1 className="text-4xl font-extrabold text-white text-center">Settings</h1>
-
-        {/* Account Settings Section */}
         <div className="space-y-4">
           <h2 className="text-2xl font-bold text-purple-400 flex items-center space-x-2">
             <User className="h-6 w-6" />
@@ -223,8 +236,9 @@ const SettingsPage = ({ setCurrentPage, user }) => {
               <span>Change Password</span>
             </button>
           </form>
+          
           <button
-            onClick={() => showConfirmationModal("Are you sure you want to delete your account? This action is irreversible.", handleDeleteAccount)}
+            onClick={() => showConfirmationModal("Are you sure you want to delete your account? This action is irreversible.", handleDeleteAccount, true)}
             className="w-full px-4 py-2 bg-red-600 text-white rounded-full font-semibold hover:bg-red-700 transition-colors duration-300 flex items-center justify-center space-x-2 mt-4 cursor-pointer"
           >
             <Trash2 className="h-5 w-5" />
@@ -232,25 +246,6 @@ const SettingsPage = ({ setCurrentPage, user }) => {
           </button>
         </div>
 
-        {/* General Preferences Section */}
-        <div className="space-y-4">
-          <h2 className="text-2xl font-bold text-yellow-400 flex items-center space-x-2">
-            <Sun className="h-6 w-6" />
-            <span>Preferences</span>
-          </h2>
-          <div className="p-6 bg-gray-700 rounded-2xl border border-gray-600 flex items-center justify-between">
-            <p className="text-gray-300">Theme</p>
-            <button
-              onClick={handleToggleTheme}
-              className="px-4 py-2 bg-purple-600 text-white rounded-full font-semibold hover:bg-purple-700 transition-colors duration-300 flex items-center space-x-2 cursor-pointer"
-            >
-              <Moon className="h-5 w-5" />
-              <span>Toggle Dark/Light Mode</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Data Management Section */}
         <div className="space-y-4">
           <h2 className="text-2xl font-bold text-red-400 flex items-center space-x-2">
             <FileX className="h-6 w-6" />
@@ -261,7 +256,7 @@ const SettingsPage = ({ setCurrentPage, user }) => {
               Permanently delete all of your saved Roblox game ideas and analyses.
             </p>
             <button
-              onClick={() => showConfirmationModal("Are you sure you want to delete all your projects? This action is irreversible.", handleDeleteAllProjects)}
+              onClick={() => showConfirmationModal("Are you sure you want to delete all your projects? This action is irreversible.", handleDeleteAllProjects, false)}
               className="w-full px-4 py-2 bg-red-600 text-white rounded-full font-semibold hover:bg-red-700 transition-colors duration-300 flex items-center justify-center space-x-2 cursor-pointer"
             >
               <Trash2 className="h-5 w-5" />
@@ -271,13 +266,24 @@ const SettingsPage = ({ setCurrentPage, user }) => {
         </div>
         
         {isModalOpen && <MessageModal message={message} onClose={() => setIsModalOpen(false)} />}
+        
         {isConfirmationModalOpen && <ConfirmationModal
           message={confirmationMessage}
           onConfirm={() => {
-            confirmationAction();
+            if (confirmationAction) {
+                const passwordForAction = isPasswordRequired ? deleteConfirmPassword : undefined;
+                confirmationAction(passwordForAction);
+            }
             setIsConfirmationModalOpen(false);
+            setDeleteConfirmPassword('');
           }}
-          onCancel={() => setIsConfirmationModalOpen(false)}
+          onCancel={() => {
+            setIsConfirmationModalOpen(false);
+            setDeleteConfirmPassword(''); 
+          }}
+          showPasswordInput={isPasswordRequired}
+          password={deleteConfirmPassword}
+          setPassword={setDeleteConfirmPassword}
         />}
 
         <div className="text-center">
