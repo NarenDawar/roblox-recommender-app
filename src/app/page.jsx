@@ -15,7 +15,7 @@ import { auth, onAuthStateChanged, db } from '../../firebase.js';
 import { doc, onSnapshot } from 'firebase/firestore';
 
 
-// Landing Page Component
+// Landing Page Component (No changes needed here)
 const LandingPage = ({ onStartAnalysis, setCurrentPage }) => (
     <div className="flex flex-col items-center justify-center min-h-screen p-4 text-gray-200 text-center bg-gray-900 animate-fadeIn">
       <div className="w-full max-w-4xl p-8 bg-gray-800 rounded-3xl shadow-2xl border border-gray-700 space-y-12">
@@ -155,7 +155,7 @@ const LandingPage = ({ onStartAnalysis, setCurrentPage }) => (
     </div>
   );
   
-  function App() {
+function App() {
     const [idea, setIdea] = useState('');
     const [analysis, setAnalysis] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -169,16 +169,21 @@ const LandingPage = ({ onStartAnalysis, setCurrentPage }) => (
     const [userTier, setUserTier] = useState('free');
     const [usage, setUsage] = useState({ count: 0, limit: 5 });
   
+    // --- THE FIX IS HERE ---
     useEffect(() => {
       setDbInstance(db);
       setAuthInstance(auth);
-  
+      
+      // Initialize an empty unsubscribe function for the user listener
+      let unsubscribeUser = () => {};
+
       const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
         setUser(currentUser);
         setIsAuthReady(true);
         if (currentUser) {
             const userDocRef = doc(db, 'users', currentUser.uid);
-            const unsubscribeUser = onSnapshot(userDocRef, (doc) => {
+            // Assign the real unsubscribe function when the user logs in
+            unsubscribeUser = onSnapshot(userDocRef, (doc) => {
                 if (doc.exists()) {
                     const data = doc.data();
                     const tier = data.tier || 'free';
@@ -188,9 +193,12 @@ const LandingPage = ({ onStartAnalysis, setCurrentPage }) => (
                         limit: tier === 'pro' ? 50 : 5
                     });
                 } else {
+                    // This case handles a lag between auth and Firestore creation
                     setUserTier('free');
                     setUsage({ count: 0, limit: 5 });
                 }
+            }, (error) => {
+                console.error("Error in user snapshot listener:", error);
             });
             
             const urlParams = new URLSearchParams(window.location.search);
@@ -201,28 +209,34 @@ const LandingPage = ({ onStartAnalysis, setCurrentPage }) => (
             } else if (currentPage === 'landing' || currentPage === 'login' || currentPage === 'signup') {
                 setCurrentPage('dashboard');
             }
-
-            return () => unsubscribeUser();
         } else {
+            // When the user logs out, call the unsubscribe function to detach the listener
+            unsubscribeUser();
             setUserTier('free');
             setCurrentPage('landing');
         }
       });
   
-      return () => unsubscribeAuth();
-    }, []);
+      // This is the main cleanup function for the useEffect hook
+      return () => {
+        unsubscribeAuth(); // Clean up the auth listener
+        unsubscribeUser(); // Also clean up the user listener here to be safe
+      };
+    }, []); // An empty dependency array ensures this runs only once on mount
   
     const handleLogout = async () => {
       if (authInstance) {
-        setCurrentPage('landing');
+        // setCurrentPage('landing') is already handled by onAuthStateChanged
         setIdea('');
         setAnalysis(null);
         setSelectedProject(null);
-        await authInstance.signOut();
+        await auth.signOut();
       }
     };
   
-    const handleLoginSuccess = () => {};
+    const handleLoginSuccess = () => {
+      setCurrentPage('dashboard');
+    };
   
     const handleStartAnalysis = () => {
       if (user) {
@@ -307,6 +321,6 @@ const LandingPage = ({ onStartAnalysis, setCurrentPage }) => (
         {content}
       </div>
     );
-  }
-  
-  export default App;
+}
+
+export default App;

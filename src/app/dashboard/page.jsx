@@ -1,3 +1,4 @@
+'use client'
 import React, { useState, useEffect } from 'react';
 import { Sparkles, PlusCircle, Trash2, Search, Lightbulb } from 'lucide-react';
 import { collection, onSnapshot, doc, deleteDoc } from 'firebase/firestore';
