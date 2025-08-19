@@ -1,11 +1,14 @@
+// app/analyzer-tool/page.jsx
+
 "use client";
 
 import React, { useState, useCallback, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Sparkles, Loader2, Rocket, ThumbsUp, ThumbsDown, Lightbulb, TrendingUp, Megaphone, ArrowLeft, ChevronDown, Users, Activity, Scaling, Palette, Download } from 'lucide-react';
+import { Sparkles, Loader2, Rocket, ThumbsUp, ThumbsDown, Lightbulb, TrendingUp, Megaphone, ArrowLeft, ChevronDown, Users, Activity, Scaling, Palette, Download, Share2, Lock } from 'lucide-react';
 import { collection, addDoc } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 
+// ... (parseAnalysis remains the same)
 const parseAnalysis = (markdown) => {
     const sections = {
       viralityPotential: '',
@@ -56,11 +59,17 @@ const parseAnalysis = (markdown) => {
     return sections;
 };
 
-const CollapsibleSection = ({ icon, title, children }) => {
+
+// **FIX: CollapsibleSection now accepts an isDisabled prop**
+const CollapsibleSection = ({ icon, title, children, isDisabled = false }) => {
   const [isOpen, setIsOpen] = useState(true);
   return (
     <div className="bg-gray-700 rounded-2xl border border-gray-600">
-      <button className="w-full flex items-center justify-between p-6 cursor-pointer" onClick={() => setIsOpen(!isOpen)}>
+      <button 
+        className={`w-full flex items-center justify-between p-6 ${isDisabled ? 'cursor-default' : 'cursor-pointer'}`} 
+        onClick={() => !isDisabled && setIsOpen(!isOpen)}
+        disabled={isDisabled}
+      >
         <h3 className="text-xl font-bold text-white flex items-center space-x-2">{icon}<span>{title}</span></h3>
         <ChevronDown className={`h-6 w-6 text-gray-400 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
@@ -69,9 +78,11 @@ const CollapsibleSection = ({ icon, title, children }) => {
   );
 };
 
-const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLoading, error, setError, db, user, initialIdea, initialAnalysis, setCurrentPage }) => {
+
+const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLoading, error, setError, db, user, selectedProject, setCurrentPage, userTier }) => {
   const [appId] = useState('roblox-analyzer');
   const [parsedAnalysis, setParsedAnalysis] = useState(null);
+  const [shareId, setShareId] = useState(null);
 
   const getScoreColor = (score) => {
     if (score === null || isNaN(score)) return 'text-gray-400';
@@ -81,16 +92,15 @@ const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLo
   };
 
   useEffect(() => {
-    if (initialAnalysis || initialIdea) {
-      setAnalysis(initialAnalysis);
-      setParsedAnalysis(initialAnalysis ? parseAnalysis(initialAnalysis) : null);
-      setIdea(initialIdea || '');
+    if (selectedProject) {
+      setAnalysis(selectedProject.analysis);
+      setParsedAnalysis(selectedProject.analysis ? parseAnalysis(selectedProject.analysis) : null);
+      setIdea(selectedProject.idea || '');
+      setShareId(selectedProject.shareId || null);
     }
-  }, [initialAnalysis, initialIdea, setAnalysis, setIdea]);
+  }, [selectedProject, setAnalysis, setIdea]);
 
-  // ------------------------ PDF DESIGN BELOW --------------------------------------------
-
-  const handleExport = async () => {
+    const handleExport = async () => {
     if (!analysis) return;
 
     const { default: jsPDF } = await import('jspdf');
@@ -151,7 +161,6 @@ const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLo
             addFooter();
             pdf.addPage();
             pageCount++;
-            // **FIX:** Apply the dark background to every new page.
             pdf.setFillColor(colors.background);
             pdf.rect(0, 0, page.width, page.height, 'F');
             addHeader();
@@ -165,7 +174,7 @@ const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLo
         pdf.setFont('Montserrat', 'bold');
         pdf.setFontSize(16);
         pdf.setTextColor(colors.text);
-        pdf.text('RBXDiscover: Roblox Idea Analysis', page.margin, page.margin - 5);
+        pdf.text('Roblox Idea Analysis', page.margin, page.margin - 5);
     };
 
     const addFooter = () => {
@@ -260,7 +269,6 @@ const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLo
     addScoreCards(parsed.viralityPotential, parsed.originality, parsed.monetizability);
     addSectionDivider();
 
-    // **FIX:** Separated sections and removed redundant text from `addBody` calls
     addHeading('Pros');
     addBody(parsed.pros);
     addSectionDivider();
@@ -302,15 +310,13 @@ const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLo
     pdf.save(`${fileName}_gdd.pdf`);
 };
 
-  // ------------------------ PDF DESIGN ABOVE --------------------------------------------
-
-  
   const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setAnalysis(null);
     setParsedAnalysis(null);
     setError(null);
+    setShareId(null);
 
     const auth = getAuth();
     const currentUser = auth.currentUser;
@@ -326,7 +332,7 @@ const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLo
 
       const response = await fetch('/api/analyze', {
         method: 'POST',
-        headers: { 
+        headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
         },
@@ -357,8 +363,16 @@ const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLo
         setParsedAnalysis(parseAnalysis(generatedAnalysis));
 
         if (db && user) {
+          const newShareId = Math.random().toString(36).substring(2, 15);
           const projectsRef = collection(db, `artifacts/${appId}/users/${user.uid}/projects`);
-          await addDoc(projectsRef, { idea, analysis: generatedAnalysis, createdAt: new Date() });
+          await addDoc(projectsRef, {
+              idea,
+              analysis: generatedAnalysis,
+              createdAt: new Date(),
+              isPublic: true,
+              shareId: newShareId
+          });
+          setShareId(newShareId);
         }
       } else {
         setError('No analysis could be generated. Please try again.');
@@ -370,6 +384,16 @@ const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLo
       setIsLoading(false);
     }
   }, [idea, setAnalysis, setIsLoading, setError, db, user, appId]);
+
+  const handleShare = () => {
+      if (!shareId) {
+          alert("Could not generate a share link. Please try generating the analysis again.");
+          return;
+      }
+      const shareLink = `${window.location.origin}/share/${shareId}`;
+      navigator.clipboard.writeText(shareLink);
+      alert("Shareable link copied to clipboard!");
+  };
 
   const markdownComponents = {
     ul: ({node, ...props}) => <ul {...props} className="list-none space-y-1" />,
@@ -402,29 +426,37 @@ const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLo
         Enter your Roblox game idea below, and our AI will provide a detailed, constructive analysis to help you make it a hit!
       </p>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <textarea
-          className="w-full h-48 p-4 text-gray-200 bg-gray-700 border border-gray-600 rounded-2xl focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none transition-all duration-300 placeholder-gray-400"
-          placeholder="Describe your Roblox game idea here..."
-          value={idea}
-          onChange={(e) => setIdea(e.target.value)}
-          required
-          disabled={isLoading}
-        />
-        <div className="flex justify-center">
-          {isLoading ? (
-            <div className="flex flex-col items-center justify-center h-12">
-              <Loader2 className="h-8 w-8 text-purple-500 animate-spin" />
-              <p className="mt-2 text-sm font-bold text-purple-400">Analyzing...</p>
-            </div>
-          ) : (
-            <button type="submit" disabled={!idea.trim()} className="px-6 py-3 bg-purple-600 text-white font-bold rounded-full shadow-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-900 transition-all duration-300 disabled:bg-gray-600 disabled:cursor-not-allowed flex items-center space-x-2 cursor-pointer">
-              <Rocket className="h-5 w-5" />
-              <span>{analysis ? 'Get New Evaluation' : 'Get Analysis'}</span>
-            </button>
-          )}
+      {!analysis && !isLoading && (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <textarea
+            className="w-full h-48 p-4 text-gray-200 bg-gray-700 border border-gray-600 rounded-2xl focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none transition-all duration-300 placeholder-gray-400"
+            placeholder="Describe your Roblox game idea here..."
+            value={idea}
+            onChange={(e) => setIdea(e.target.value)}
+            required
+            disabled={isLoading}
+          />
+          <div className="flex justify-center">
+              <button 
+                type="submit" 
+                disabled={!idea.trim()} 
+                className="px-6 py-3 bg-purple-600 text-white font-bold rounded-full shadow-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-900 transition-all duration-300 disabled:bg-gray-600 disabled:cursor-not-allowed flex items-center space-x-2 cursor-pointer"
+              >
+                <Rocket className="h-5 w-5" />
+                <span>Get Analysis</span>
+              </button>
+          </div>
+        </form>
+      )}
+
+
+      {isLoading && (
+        <div className="flex flex-col items-center justify-center h-12 mt-4">
+          <Loader2 className="h-8 w-8 text-purple-500 animate-spin" />
+          <p className="mt-2 text-sm font-bold text-purple-400">Analyzing...</p>
         </div>
-      </form>
+      )}
+
 
       {error && (
         <div className="mt-8 p-4 bg-red-800 text-white rounded-2xl border border-red-700">
@@ -441,13 +473,35 @@ const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLo
                     <Sparkles className="h-6 w-6 text-yellow-400" />
                     <h2 className="text-2xl font-bold text-white">AI Analysis Report</h2>
                 </div>
-                <button 
-                    onClick={handleExport}
-                    className="px-4 py-2 bg-green-600 text-white font-bold rounded-full shadow-lg hover:bg-green-700 flex items-center space-x-2 cursor-pointer"
-                >
-                    <Download className="h-5 w-5" />
-                    <span>Export GDD</span>
-                </button>
+                <div className="flex items-center space-x-2">
+                    <button 
+                        onClick={handleShare}
+                        className="px-4 py-2 bg-blue-600 text-white font-bold rounded-full shadow-lg hover:bg-blue-700 flex items-center space-x-2 cursor-pointer"
+                    >
+                        <Share2 className="h-5 w-5" />
+                        <span>Share</span>
+                    </button>
+                    
+                    {userTier !== 'free' ? (
+                      <button 
+                          onClick={handleExport}
+                          className="px-4 py-2 bg-green-600 text-white font-bold rounded-full shadow-lg hover:bg-green-700 flex items-center space-x-2 cursor-pointer"
+                      >
+                          <Download className="h-5 w-5" />
+                          <span>Export GDD</span>
+                      </button>
+                    ) : (
+                      <button 
+                          onClick={() => setCurrentPage('checkout')}
+                          className="px-4 py-2 bg-gray-600 text-white font-bold rounded-full shadow-inner flex items-center space-x-2 cursor-pointer"
+                          title="Upgrade to Pro to export as PDF"
+                      >
+                          <Lock className="h-5 w-5" />
+                          <span>Export GDD</span>
+                      </button>
+                    )}
+
+                </div>
             </div>
 
             <div className="bg-gray-700 p-6 rounded-2xl border border-gray-600">
@@ -466,14 +520,39 @@ const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLo
             <CollapsibleSection icon={<Palette className="h-5 w-5 text-pink-400" />} title="Creative Assets"><ReactMarkdown components={markdownComponents}>{parsedAnalysis?.creativeAssets}</ReactMarkdown></CollapsibleSection>
             <CollapsibleSection icon={<TrendingUp className="h-5 w-5 text-yellow-400" />} title="Monetization Strategy"><ReactMarkdown components={markdownComponents}>{parsedAnalysis?.monetization}</ReactMarkdown></CollapsibleSection>
             <CollapsibleSection icon={<Megaphone className="h-5 w-5 text-purple-400" />} title="Promotion Strategies"><ReactMarkdown components={markdownComponents}>{parsedAnalysis?.promotion}</ReactMarkdown></CollapsibleSection>
+            
             <div className="flex items-center space-x-2 pt-4">
               <div className="h-px bg-gray-600 flex-grow"></div>
               <h2 className="text-xl font-bold text-gray-300">Deeper Look</h2>
               <div className="h-px bg-gray-600 flex-grow"></div>
             </div>
-            <CollapsibleSection icon={<Users className="h-5 w-5 text-teal-400" />} title="Target Audience"><ReactMarkdown components={markdownComponents}>{parsedAnalysis?.targetAudience}</ReactMarkdown></CollapsibleSection>
-            <CollapsibleSection icon={<Activity className="h-5 w-5 text-orange-400" />} title="Trend Alignment"><ReactMarkdown components={markdownComponents}>{parsedAnalysis?.trendAlignment}</ReactMarkdown></CollapsibleSection>
-            <CollapsibleSection icon={<Scaling className="h-5 w-5 text-indigo-400" />} title="Comparative Analysis"><ReactMarkdown components={markdownComponents}>{parsedAnalysis?.comparativeAnalysis}</ReactMarkdown></CollapsibleSection>
+            
+            {userTier === 'free' ? (
+                <div className="relative bg-gray-700 p-10 rounded-2xl border border-dashed border-gray-600 text-center">
+                    {/* **FIX: The blur and the upgrade button are now correctly layered using z-index** */}
+                    <div className="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex flex-col items-center justify-center rounded-2xl z-10">
+                        <Lock className="h-12 w-12 text-yellow-400 mb-4" />
+                        <h3 className="text-2xl font-bold text-white mb-2">This is a Pro Feature</h3>
+                        <p className="text-gray-300 mb-6">Upgrade to unlock the Deeper Look analysis.</p>
+                        <button onClick={() => setCurrentPage('checkout')} className="px-6 py-3 bg-purple-600 text-white font-bold rounded-full shadow-lg hover:bg-purple-700">
+                            Upgrade to Pro
+                        </button>
+                    </div>
+                    <div className="opacity-20">
+                        {/* **FIX: The CollapsibleSection components are now disabled for free users** */}
+                        <CollapsibleSection icon={<Users className="h-5 w-5 text-teal-400" />} title="Target Audience" isDisabled={true} />
+                        <div className="mt-4"><CollapsibleSection icon={<Activity className="h-5 w-5 text-orange-400" />} title="Trend Alignment" isDisabled={true} /></div>
+                        <div className="mt-4"><CollapsibleSection icon={<Scaling className="h-5 w-5 text-indigo-400" />} title="Comparative Analysis" isDisabled={true} /></div>
+                    </div>
+                </div>
+            ) : (
+                <>
+                    <CollapsibleSection icon={<Users className="h-5 w-5 text-teal-400" />} title="Target Audience"><ReactMarkdown components={markdownComponents}>{parsedAnalysis?.targetAudience}</ReactMarkdown></CollapsibleSection>
+                    <CollapsibleSection icon={<Activity className="h-5 w-5 text-orange-400" />} title="Trend Alignment"><ReactMarkdown components={markdownComponents}>{parsedAnalysis?.trendAlignment}</ReactMarkdown></CollapsibleSection>
+                    <CollapsibleSection icon={<Scaling className="h-5 w-5 text-indigo-400" />} title="Comparative Analysis"><ReactMarkdown components={markdownComponents}>{parsedAnalysis?.comparativeAnalysis}</ReactMarkdown></CollapsibleSection>
+                </>
+            )}
+
           </div>
         )}
       </div>

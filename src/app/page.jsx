@@ -276,7 +276,21 @@ function App() {
           content = <LandingPage onStartAnalysis={handleStartAnalysis} setCurrentPage={setCurrentPage} />;
           break;
         case 'analyzer':
-          content = <AnalyzerTool idea={idea} setIdea={setIdea} analysis={analysis} setAnalysis={setAnalysis} isLoading={isLoading} setIsLoading={setIsLoading} error={error} setError={setError} db={dbInstance} user={user} initialAnalysis={selectedProject?.analysis} initialIdea={selectedProject?.idea} setCurrentPage={setCurrentPage} />;
+          content = <AnalyzerTool 
+          idea={idea} 
+          setIdea={setIdea} 
+          analysis={analysis} 
+          setAnalysis={setAnalysis} 
+          isLoading={isLoading} 
+          setIsLoading={setIsLoading} 
+          error={error} 
+          setError={setError} 
+          db={dbInstance} 
+          user={user} 
+          selectedProject={selectedProject} // Pass the whole object
+          setCurrentPage={setCurrentPage} 
+          userTier={userTier} 
+        />;          
           break;
         case 'dashboard':
           content = <Dashboard setCurrentPage={setCurrentPage} db={dbInstance} user={user} onProjectSelect={onProjectSelect} onStartNewProject={onStartNewProject} userTier={userTier} usage={usage} />;
