@@ -2,13 +2,11 @@
 
 import Stripe from 'stripe';
 import { getFirestore } from 'firebase-admin/firestore';
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { initializeApp, getApps } from 'firebase-admin/app'; // Removed 'cert'
 
 // Initialize Firebase Admin SDK
 if (!getApps().length) {
-  initializeApp({
-    credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY))
-  });
+  initializeApp();
 }
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);

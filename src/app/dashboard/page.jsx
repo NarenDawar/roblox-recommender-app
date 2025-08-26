@@ -118,7 +118,11 @@ const Dashboard = ({ setCurrentPage, db, user, onProjectSelect, onStartNewProjec
                 <span className="text-gray-400">{usage.count} / {usage.limit}</span>
             </div>
             <div className="w-full bg-gray-600 rounded-full h-2.5">
-                <div className="bg-purple-600 h-2.5 rounded-full" style={{ width: `${(usage.count / usage.limit) * 100}%` }}></div>
+                {/* --- THE FIX IS HERE --- */}
+                <div 
+                    className="bg-purple-600 h-2.5 rounded-full" 
+                    style={{ width: `${Math.min((usage.count / usage.limit) * 100, 100)}%` }}
+                ></div>
             </div>
         </div>
 

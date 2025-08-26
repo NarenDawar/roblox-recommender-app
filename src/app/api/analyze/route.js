@@ -72,7 +72,7 @@ export async function POST(req) {
           "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
         },
         body: JSON.stringify({
-          model: "gpt-5-nano", // NOTE: This model name might need to be updated to a valid one like gpt-4-turbo
+          model: "gpt-5-nano", 
           messages: [
             {
               role: "system",

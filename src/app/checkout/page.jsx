@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { ArrowLeft, Lock, Loader2 } from 'lucide-react';
+import { getAuth } from 'firebase/auth';
 
 const CheckoutPage = ({ setCurrentPage, user }) => {
   const [isLoading, setIsLoading] = useState(false);
@@ -11,11 +12,26 @@ const CheckoutPage = ({ setCurrentPage, user }) => {
     setIsLoading(true);
     setError(null);
 
+    const auth = getAuth();
+    const currentUser = auth.currentUser;
+
+    if (!currentUser) {
+        setError("You must be logged in to proceed.");
+        setIsLoading(false);
+        return;
+    }
+
     try {
+      // --- THE FIX IS HERE ---
+      // Pass `true` to force a refresh and get a new token.
+      const token = await currentUser.getIdToken(true);
+
+
       const response = await fetch('/api/checkout', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           userId: user.uid,
@@ -32,7 +48,6 @@ const CheckoutPage = ({ setCurrentPage, user }) => {
       }
 
       if (url) {
-        // Redirect the user to the Stripe checkout page
         window.location.href = url;
       }
     } catch (err) {
@@ -59,7 +74,7 @@ const CheckoutPage = ({ setCurrentPage, user }) => {
       <div className="bg-gray-700 p-6 rounded-2xl border border-gray-600 space-y-4">
         <div className="flex justify-between items-center">
           <p className="text-lg text-white font-bold">Pro Plan</p>
-          <p className="text-lg text-white font-bold">$15.00 / month</p>
+          <p className="text-lg text-white font-bold">$10.00 / month</p>
         </div>
         <p className="text-gray-400 text-sm">
           You'll get unlimited access to all pro features, including the Idea Generator, advanced analysis, and unlimited project saves.

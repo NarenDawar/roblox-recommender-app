@@ -4,7 +4,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Sparkles, Loader2, Rocket, ThumbsUp, ThumbsDown, Lightbulb, TrendingUp, Megaphone, ArrowLeft, ChevronDown, Users, Activity, Scaling, Palette, Download, Share2, Lock } from 'lucide-react';
+import { Sparkles, Loader2, Rocket, ThumbsUp, ThumbsDown, Lightbulb, TrendingUp, Megaphone, ArrowLeft, ChevronDown, Users, Activity, Scaling, Palette, Download, Lock } from 'lucide-react';
 import { collection, addDoc } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 
@@ -65,8 +65,8 @@ const CollapsibleSection = ({ icon, title, children, isDisabled = false }) => {
   const [isOpen, setIsOpen] = useState(true);
   return (
     <div className="bg-gray-700 rounded-2xl border border-gray-600">
-      <button 
-        className={`w-full flex items-center justify-between p-6 ${isDisabled ? 'cursor-default' : 'cursor-pointer'}`} 
+      <button
+        className={`w-full flex items-center justify-between p-6 ${isDisabled ? 'cursor-default' : 'cursor-pointer'}`}
         onClick={() => !isDisabled && setIsOpen(!isOpen)}
         disabled={isDisabled}
       >
@@ -82,7 +82,6 @@ const CollapsibleSection = ({ icon, title, children, isDisabled = false }) => {
 const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLoading, error, setError, db, user, selectedProject, setCurrentPage, userTier }) => {
   const [appId] = useState('roblox-analyzer');
   const [parsedAnalysis, setParsedAnalysis] = useState(null);
-  const [shareId, setShareId] = useState(null);
 
   const getScoreColor = (score) => {
     if (score === null || isNaN(score)) return 'text-gray-400';
@@ -96,7 +95,6 @@ const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLo
       setAnalysis(selectedProject.analysis);
       setParsedAnalysis(selectedProject.analysis ? parseAnalysis(selectedProject.analysis) : null);
       setIdea(selectedProject.idea || '');
-      setShareId(selectedProject.shareId || null);
     }
   }, [selectedProject, setAnalysis, setIdea]);
 
@@ -272,7 +270,7 @@ const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLo
     addHeading('Pros');
     addBody(parsed.pros);
     addSectionDivider();
-    
+
     addHeading('Cons');
     addBody(parsed.cons);
     addSectionDivider();
@@ -284,7 +282,7 @@ const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLo
     addHeading('Monetization Strategy');
     addBody(parsed.monetization);
     addSectionDivider();
-    
+
     addHeading('Promotion Strategies');
     addBody(parsed.promotion);
     addSectionDivider();
@@ -296,11 +294,11 @@ const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLo
     addHeading('Target Audience');
     addBody(parsed.targetAudience);
     addSectionDivider();
-    
+
     addHeading('Trend Alignment');
     addBody(parsed.trendAlignment);
     addSectionDivider();
-    
+
     addHeading('Comparative Analysis');
     addBody(parsed.comparativeAnalysis);
 
@@ -316,7 +314,6 @@ const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLo
     setAnalysis(null);
     setParsedAnalysis(null);
     setError(null);
-    setShareId(null);
 
     const auth = getAuth();
     const currentUser = auth.currentUser;
@@ -363,16 +360,13 @@ const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLo
         setParsedAnalysis(parseAnalysis(generatedAnalysis));
 
         if (db && user) {
-          const newShareId = Math.random().toString(36).substring(2, 15);
           const projectsRef = collection(db, `artifacts/${appId}/users/${user.uid}/projects`);
           await addDoc(projectsRef, {
               idea,
               analysis: generatedAnalysis,
               createdAt: new Date(),
               isPublic: true,
-              shareId: newShareId
           });
-          setShareId(newShareId);
         }
       } else {
         setError('No analysis could be generated. Please try again.');
@@ -384,16 +378,6 @@ const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLo
       setIsLoading(false);
     }
   }, [idea, setAnalysis, setIsLoading, setError, db, user, appId]);
-
-  const handleShare = () => {
-      if (!shareId) {
-          alert("Could not generate a share link. Please try generating the analysis again.");
-          return;
-      }
-      const shareLink = `${window.location.origin}/share/${shareId}`;
-      navigator.clipboard.writeText(shareLink);
-      alert("Shareable link copied to clipboard!");
-  };
 
   const markdownComponents = {
     ul: ({node, ...props}) => <ul {...props} className="list-none space-y-1" />,
@@ -437,9 +421,9 @@ const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLo
             disabled={isLoading}
           />
           <div className="flex justify-center">
-              <button 
-                type="submit" 
-                disabled={!idea.trim()} 
+              <button
+                type="submit"
+                disabled={!idea.trim()}
                 className="px-6 py-3 bg-purple-600 text-white font-bold rounded-full shadow-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-900 transition-all duration-300 disabled:bg-gray-600 disabled:cursor-not-allowed flex items-center space-x-2 cursor-pointer"
               >
                 <Rocket className="h-5 w-5" />
@@ -474,16 +458,8 @@ const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLo
                     <h2 className="text-2xl font-bold text-white">AI Analysis Report</h2>
                 </div>
                 <div className="flex items-center space-x-2">
-                    <button 
-                        onClick={handleShare}
-                        className="px-4 py-2 bg-blue-600 text-white font-bold rounded-full shadow-lg hover:bg-blue-700 flex items-center space-x-2 cursor-pointer"
-                    >
-                        <Share2 className="h-5 w-5" />
-                        <span>Share</span>
-                    </button>
-                    
                     {userTier !== 'free' ? (
-                      <button 
+                      <button
                           onClick={handleExport}
                           className="px-4 py-2 bg-green-600 text-white font-bold rounded-full shadow-lg hover:bg-green-700 flex items-center space-x-2 cursor-pointer"
                       >
@@ -491,7 +467,7 @@ const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLo
                           <span>Export GDD</span>
                       </button>
                     ) : (
-                      <button 
+                      <button
                           onClick={() => setCurrentPage('checkout')}
                           className="px-4 py-2 bg-gray-600 text-white font-bold rounded-full shadow-inner flex items-center space-x-2 cursor-pointer"
                           title="Upgrade to Pro to export as PDF"
@@ -520,13 +496,13 @@ const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLo
             <CollapsibleSection icon={<Palette className="h-5 w-5 text-pink-400" />} title="Creative Assets"><ReactMarkdown components={markdownComponents}>{parsedAnalysis?.creativeAssets}</ReactMarkdown></CollapsibleSection>
             <CollapsibleSection icon={<TrendingUp className="h-5 w-5 text-yellow-400" />} title="Monetization Strategy"><ReactMarkdown components={markdownComponents}>{parsedAnalysis?.monetization}</ReactMarkdown></CollapsibleSection>
             <CollapsibleSection icon={<Megaphone className="h-5 w-5 text-purple-400" />} title="Promotion Strategies"><ReactMarkdown components={markdownComponents}>{parsedAnalysis?.promotion}</ReactMarkdown></CollapsibleSection>
-            
+
             <div className="flex items-center space-x-2 pt-4">
               <div className="h-px bg-gray-600 flex-grow"></div>
               <h2 className="text-xl font-bold text-gray-300">Deeper Look</h2>
               <div className="h-px bg-gray-600 flex-grow"></div>
             </div>
-            
+
             {userTier === 'free' ? (
                 <div className="relative bg-gray-700 p-10 rounded-2xl border border-dashed border-gray-600 text-center">
                     {/* **FIX: The blur and the upgrade button are now correctly layered using z-index** */}

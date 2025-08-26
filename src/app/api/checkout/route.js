@@ -2,7 +2,7 @@ import Stripe from 'stripe';
 import { getAuth } from 'firebase-admin/auth';
 import { initializeApp, getApps } from 'firebase-admin/app';
 
-// --- SECURE INITIALIZATION ---
+// --- ROBUST INITIALIZATION ---
 if (!getApps().length) {
   initializeApp();
 }
@@ -16,7 +16,7 @@ export async function POST(req) {
     // --- SECURITY CHECK ---
     const authorization = req.headers.get('authorization');
     if (!authorization?.startsWith('Bearer ')) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+      return new Response(JSON.stringify({ error: 'Unauthorized: Missing Bearer token' }), { status: 401 });
     }
 
     const token = authorization.split('Bearer ')[1];
@@ -24,13 +24,21 @@ export async function POST(req) {
     try {
       decodedToken = await auth.verifyIdToken(token);
     } catch (error) {
-      return new Response(JSON.stringify({ error: 'Invalid token' }), { status: 401 });
+      // --- MODIFICATION IS HERE ---
+      // Log the detailed error to the server console for debugging.
+      console.error("Firebase token verification failed:", error); 
+      
+      // You can also check for specific error codes for more tailored responses
+      if (error.code === 'auth/id-token-expired') {
+        return new Response(JSON.stringify({ error: 'Token expired', details: error.message }), { status: 401 });
+      }
+      
+      return new Response(JSON.stringify({ error: 'Invalid token', details: error.message }), { status: 401 });
     }
-    // --- END SECURITY CHECK ---
+    // --- END SECURITY CHECK & MODIFICATION ---
 
     const { userId, email } = await req.json();
 
-    // Verify that the user making the request is the one they claim to be
     if (decodedToken.uid !== userId) {
         return new Response(JSON.stringify({ error: 'User mismatch' }), { status: 403 });
     }
@@ -49,7 +57,7 @@ export async function POST(req) {
               name: 'Pro Plan',
               description: 'Full access to the Roblox Idea Analyzer Pro features.',
             },
-            unit_amount: 1000, // $10.00 in cents
+            unit_amount: 1000,
             recurring: {
               interval: 'month',
             },
@@ -66,7 +74,7 @@ export async function POST(req) {
 
     return new Response(JSON.stringify({ url: session.url }), { status: 200 });
   } catch (error) {
-    console.error('Stripe error:', error.message);
+    console.error('Stripe or other internal error:', error.message);
     return new Response(JSON.stringify({ error: 'Could not create a payment session.' }), { status: 500 });
   }
 }
