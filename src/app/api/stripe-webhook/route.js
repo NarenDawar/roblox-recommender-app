@@ -10,13 +10,14 @@ if (!admin.apps.length) {
         admin.initializeApp({
             credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY))
         });
-    } else {
-        // For local development, fall back to the serviceAccountKey.json file
-        const serviceAccount = require('../../../../serviceAccountKey.json'); // Adjust path as needed
-        admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount)
-        });
-    }
+    } /* else {
+      // For local development, fall back to the serviceAccountKey.json file
+      const serviceAccount = require('../../../../serviceAccountKey.json'); // Adjust path as needed
+      admin.initializeApp({
+          credential: admin.credential.cert(serviceAccount)
+      });
+  }
+      */
   } catch (error) {
     console.error('Firebase admin initialization error', error.stack);
   }
