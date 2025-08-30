@@ -1,13 +1,27 @@
 import { getAuth } from 'firebase-admin/auth';
+import admin from 'firebase-admin';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { initializeApp, getApps } from 'firebase-admin/app'; // Removed 'cert'
 
-// --- ROBUST INITIALIZATION ---
-// This automatically finds your credentials using the GOOGLE_APPLICATION_CREDENTIALS env variable
-if (!getApps().length) {
-  initializeApp();
+// This block handles both Vercel deployment and local development
+if (!admin.apps.length) {
+  try {
+    // When deployed to Vercel, use the environment variable
+    if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+        admin.initializeApp({
+            credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY))
+        });
+    } else {
+        // For local development, fall back to the serviceAccountKey.json file
+        const serviceAccount = require('../../../../serviceAccountKey.json'); // Adjust path as needed
+        admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount)
+        });
+    }
+  } catch (error) {
+    console.error('Firebase admin initialization error', error.stack);
+  }
 }
-// --- END ---
 
 const db = getFirestore();
 const auth = getAuth();

@@ -1,13 +1,13 @@
 import React from 'react';
-import { Sparkles, LogIn, UserPlus, LayoutDashboard, LogOut, Settings } from 'lucide-react';
+import { Sparkles, LogIn, UserPlus, LayoutDashboard, LogOut, Settings, Rocket } from 'lucide-react';
 
-const Header = ({ setCurrentPage, userIsAuthenticated, onLogout }) => {
+const Header = ({ setCurrentPage, userIsAuthenticated, onLogout, userTier }) => {
   return (
     <header className="sticky top-0 z-50 bg-gray-900 bg-opacity-90 backdrop-filter backdrop-blur-lg border-b border-gray-700 p-4">
       <div className="flex items-center justify-between w-full max-w-7xl mx-auto">
         <div className="flex items-center space-x-2 cursor-pointer" onClick={() => setCurrentPage('landing')}>
           <Sparkles className="h-8 w-8 text-yellow-400" />
-          <span className="text-2xl font-extrabold text-white">Roblox Analyzer</span>
+          <span className="text-2xl font-extrabold text-white">RBXDiscover</span>
         </div>
         <div className="flex items-center space-x-4">
           {userIsAuthenticated ? (
@@ -26,6 +26,15 @@ const Header = ({ setCurrentPage, userIsAuthenticated, onLogout }) => {
                 <Settings className="h-5 w-5" />
                 <span>Settings</span>
               </button>
+              {userTier === 'free' && (
+                <button
+                  onClick={() => setCurrentPage('upgrade')}
+                  className="px-4 py-2 bg-green-600 text-white rounded-full font-semibold hover:bg-green-700 transition-colors duration-300 flex items-center space-x-2 cursor-pointer"
+                >
+                  <Rocket className="h-5 w-5" />
+                  <span>Upgrade</span>
+                </button>
+              )}
               <button
                 onClick={onLogout}
                 className="px-4 py-2 bg-purple-600 text-white rounded-full font-semibold hover:bg-purple-700 transition-colors duration-300 flex items-center space-x-2 cursor-pointer"

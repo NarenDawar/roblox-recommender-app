@@ -1,80 +1,63 @@
+import admin from 'firebase-admin';
 import Stripe from 'stripe';
-import { getAuth } from 'firebase-admin/auth';
-import { initializeApp, getApps } from 'firebase-admin/app';
-
-// --- ROBUST INITIALIZATION ---
-if (!getApps().length) {
-  initializeApp();
-}
-const auth = getAuth();
-// --- END ---
+import { NextResponse } from 'next/server';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+if (!admin.apps.length) {
+  try {
+    // When deployed to Vercel, use the environment variable
+    if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+        admin.initializeApp({
+            credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY))
+        });
+    } else {
+        // For local development, fall back to the serviceAccountKey.json file
+        const serviceAccount = require('../../../../serviceAccountKey.json'); // Adjust path as needed
+        admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount)
+        });
+    }
+  } catch (error) {
+    console.error('Firebase admin initialization error', error.stack);
+  }
+}
 
 export async function POST(req) {
   try {
-    // --- SECURITY CHECK ---
-    const authorization = req.headers.get('authorization');
-    if (!authorization?.startsWith('Bearer ')) {
-      return new Response(JSON.stringify({ error: 'Unauthorized: Missing Bearer token' }), { status: 401 });
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized: No token provided' }, { status: 401 });
     }
+    const idToken = authHeader.split('Bearer ')[1];
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const uid = decodedToken.uid;
 
-    const token = authorization.split('Bearer ')[1];
-    let decodedToken;
-    try {
-      decodedToken = await auth.verifyIdToken(token);
-    } catch (error) {
-      // --- MODIFICATION IS HERE ---
-      // Log the detailed error to the server console for debugging.
-      console.error("Firebase token verification failed:", error); 
-      
-      // You can also check for specific error codes for more tailored responses
-      if (error.code === 'auth/id-token-expired') {
-        return new Response(JSON.stringify({ error: 'Token expired', details: error.message }), { status: 401 });
-      }
-      
-      return new Response(JSON.stringify({ error: 'Invalid token', details: error.message }), { status: 401 });
-    }
-    // --- END SECURITY CHECK & MODIFICATION ---
+    const { priceId, plan } = await req.json();
 
-    const { userId, email } = await req.json();
-
-    if (decodedToken.uid !== userId) {
-        return new Response(JSON.stringify({ error: 'User mismatch' }), { status: 403 });
-    }
-
-    if (!userId || !email) {
-      return new Response(JSON.stringify({ error: 'User information is missing.' }), { status: 400 });
-    }
+    console.log(`[Checkout] Creating session for user: ${uid}, plan: ${plan}, priceId: ${priceId}`);
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
-      line_items: [
-        {
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: 'Pro Plan',
-              description: 'Full access to the Roblox Idea Analyzer Pro features.',
-            },
-            unit_amount: 1000,
-            recurring: {
-              interval: 'month',
-            },
-          },
-          quantity: 1,
-        },
-      ],
+      line_items: [{ price: priceId, quantity: 1 }],
       mode: 'subscription',
-      client_reference_id: userId,
-      customer_email: email,
-      success_url: `${process.env.NEXT_PUBLIC_URL}/?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_URL}/?canceled=true`,
+      // FIX: Added a URL parameter to pass the plan to the success page
+      success_url: `${req.headers.get('origin')}/success?plan=${plan}`,
+      cancel_url: `${req.headers.get('origin')}/cancel`,
+      client_reference_id: uid,
+      subscription_data: {
+        metadata: {
+          tier: plan,
+        }
+      }
     });
 
-    return new Response(JSON.stringify({ url: session.url }), { status: 200 });
+    return NextResponse.json({ sessionId: session.id });
+
   } catch (error) {
-    console.error('Stripe or other internal error:', error.message);
-    return new Response(JSON.stringify({ error: 'Could not create a payment session.' }), { status: 500 });
+    console.error('[Checkout] Error creating checkout session:', error);
+    if (error.code === 'auth/id-token-expired') {
+        return NextResponse.json({ error: 'Unauthorized: Token expired' }, { status: 401 });
+    }
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }

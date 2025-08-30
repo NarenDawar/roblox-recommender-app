@@ -60,7 +60,7 @@ const ProjectCard = ({ project, onProjectSelect, showConfirmationModal }) => {
     );
 };
 
-const Dashboard = ({ setCurrentPage, db, user, onProjectSelect, onStartNewProject, userTier, usage }) => {
+const Dashboard = ({ setCurrentPage, db, user, onProjectSelect, onStartNewProject, userTier, usage = { count: 0, limit: 5 } }) => {
   const [projects, setProjects] = useState([]);
   const [appId] = useState('roblox-analyzer');
   const [isConfirmationModalOpen, setIsConfirmationModalOpen] = useState(false);
@@ -112,19 +112,20 @@ const Dashboard = ({ setCurrentPage, db, user, onProjectSelect, onStartNewProjec
         </div>
         <p className="text-lg sm:text-xl text-gray-400 max-w-2xl mx-auto">Welcome back! Here you can manage your ideas and start a new project.</p>
         
-        <div className="w-full max-w-md mx-auto bg-gray-700 p-4 rounded-xl">
-            <div className="flex justify-between items-center mb-1 text-sm">
-                <span className="font-semibold text-white">Monthly Usage</span>
-                <span className="text-gray-400">{usage.count} / {usage.limit}</span>
-            </div>
-            <div className="w-full bg-gray-600 rounded-full h-2.5">
-                {/* --- THE FIX IS HERE --- */}
-                <div 
-                    className="bg-purple-600 h-2.5 rounded-full" 
-                    style={{ width: `${Math.min((usage.count / usage.limit) * 100, 100)}%` }}
-                ></div>
-            </div>
-        </div>
+        {userTier !== 'enterprise' && (
+          <div className="w-full max-w-md mx-auto bg-gray-700 p-4 rounded-xl">
+              <div className="flex justify-between items-center mb-1 text-sm">
+                  <span className="font-semibold text-white">Monthly Usage</span>
+                  <span className="text-gray-400">{usage.count} / {usage.limit}</span>
+              </div>
+              <div className="w-full bg-gray-600 rounded-full h-2.5">
+                  <div 
+                      className="bg-purple-600 h-2.5 rounded-full" 
+                      style={{ width: `${Math.min((usage.count / usage.limit) * 100, 100)}%` }}
+                  ></div>
+              </div>
+          </div>
+        )}
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
             <button onClick={onStartNewProject} className="w-full sm:w-auto px-8 py-4 bg-purple-600 text-white font-bold text-lg rounded-full shadow-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-900 transition-all duration-300 flex items-center justify-center space-x-2"><PlusCircle className="h-6 w-6" /><span>Analyze an Idea</span></button>

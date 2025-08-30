@@ -9,6 +9,7 @@ import AnalyzerTool from './analyzer-tool/page.jsx';
 import SettingsPage from './settings/page.jsx';
 import GeneratorPage from './generator/page.jsx';
 import CheckoutPage from './checkout/page.jsx';
+import UpgradePage from './upgrade/page.jsx';
 import SuccessPage from './success/page.jsx';
 import CancelPage from './cancel/page.jsx';
 import { auth, onAuthStateChanged, db } from '../../firebase.js';
@@ -92,11 +93,10 @@ const LandingPage = ({ onStartAnalysis, setCurrentPage }) => (
               </div>
               <ul className="space-y-2 text-gray-300 flex-grow">
                 <li className="flex items-center space-x-2"><CheckCircle className="h-5 w-5 text-green-400"/><span>50 analyses per month</span></li>
-                <li className="flex items-center space-x-2"><CheckCircle className="h-5 w-5 text-green-400"/><span>Unlimited projects saved</span></li>
-                <li className="flex items-center space-x-2"><CheckCircle className="h-5 w-5 text-green-400"/><span>Deeper analysis & Creative Assets</span></li>
+                <li className="flex items-center space-x-2"><CheckCircle className="h-5 w-5 text-green-400"/><span>Deeper analysis</span></li>
                  <li className="flex items-center space-x-2"><CheckCircle className="h-5 w-5 text-green-400"/><span>AI Idea Generator</span></li>
               </ul>
-              <button onClick={() => setCurrentPage('checkout')} className="mt-6 w-full px-4 py-2 bg-purple-600 text-white font-bold rounded-full shadow-lg hover:bg-purple-700 transition-all duration-300 cursor-pointer">Upgrade to Pro</button>
+              <button onClick={() => setCurrentPage('checkout', { plan: 'pro' })} className="mt-6 w-full px-4 py-2 bg-purple-600 text-white font-bold rounded-full shadow-lg hover:bg-purple-700 transition-all duration-300 cursor-pointer">Upgrade to Pro</button>
             </div>
             <div className="bg-gray-700 p-6 rounded-2xl border border-gray-600 flex flex-col">
               <h3 className="text-2xl font-bold text-red-400 mb-2">Enterprise</h3>
@@ -107,10 +107,10 @@ const LandingPage = ({ onStartAnalysis, setCurrentPage }) => (
               </div>
               <ul className="space-y-2 text-gray-300 flex-grow">
                 <li className="flex items-center space-x-2"><CheckCircle className="h-5 w-5 text-green-400"/><span>Unlimited analyses</span></li>
-                <li className="flex items-center space-x-2"><CheckCircle className="h-5 w-5 text-green-400"/><span>Shared workspaces</span></li>
-                <li className="flex items-center space-x-2"><CheckCircle className="h-5 w-5 text-green-400"/><span>$5/additional member</span></li>
+                <li className="flex items-center space-x-2"><CheckCircle className="h-5 w-5 text-green-400"/><span>Priority Support</span></li>
+                <li className="flex items-center space-x-2"><CheckCircle className="h-5 w-5 text-green-400"/><span>Feature Requests</span></li>
               </ul>
-              <a href="mailto:rbxdiscover@gmail.com" className="mt-6 w-full text-center block px-4 py-2 bg-gray-600 text-white font-bold rounded-full shadow-lg hover:bg-gray-700 transition-all duration-300 cursor-pointer">Contact Us</a>
+              <button onClick={() => setCurrentPage('checkout', { plan: 'enterprise' })} className="mt-6 w-full text-center block px-4 py-2 bg-gray-600 text-white font-bold rounded-full shadow-lg hover:bg-gray-700 transition-all duration-300 cursor-pointer">Get Started</button>
             </div>
           </div>
         </div>
@@ -160,7 +160,7 @@ function App() {
     const [analysis, setAnalysis] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [currentPage, setCurrentPage] = useState('landing');
+    const [currentPage, setCurrentPageState] = useState({ page: 'landing', props: {} });
     const [user, setUser] = useState(null);
     const [dbInstance, setDbInstance] = useState(null);
     const [authInstance, setAuthInstance] = useState(null);
@@ -168,6 +168,10 @@ function App() {
     const [selectedProject, setSelectedProject] = useState(null);
     const [userTier, setUserTier] = useState('free');
     const [usage, setUsage] = useState({ count: 0, limit: 5 });
+
+    const setCurrentPage = (page, props = {}) => {
+      setCurrentPageState({ page, props });
+    };
   
     // --- THE FIX IS HERE ---
     useEffect(() => {
@@ -206,7 +210,7 @@ function App() {
                 setCurrentPage('success');
             } else if (urlParams.has('canceled')) {
                 setCurrentPage('cancel');
-            } else if (currentPage === 'landing' || currentPage === 'login' || currentPage === 'signup') {
+            } else if (currentPage.page === 'landing' || currentPage.page === 'login' || currentPage.page === 'signup') {
                 setCurrentPage('dashboard');
             }
         } else {
@@ -271,7 +275,7 @@ function App() {
     if (!isAuthReady) {
       content = <div className="flex items-center justify-center min-h-screen text-white">Loading Application...</div>;
     } else {
-      switch (currentPage) {
+      switch (currentPage.page) {
         case 'landing':
           content = <LandingPage onStartAnalysis={handleStartAnalysis} setCurrentPage={setCurrentPage} />;
           break;
@@ -298,6 +302,9 @@ function App() {
         case 'login':
           content = <LoginPage setCurrentPage={setCurrentPage} onLoginSuccess={handleLoginSuccess} />;
           break;
+        case 'upgrade':
+          content = <UpgradePage setCurrentPage={setCurrentPage} />;
+          break;
         case 'signup':
           content = <SignupPage setCurrentPage={setCurrentPage} />;
           break;
@@ -311,12 +318,12 @@ function App() {
                 content = <div className="text-center p-10">
                     <h2 className="text-3xl font-bold text-white mb-4">This is a Pro Feature!</h2>
                     <p className="text-gray-400 mb-6">Upgrade to Pro to use the AI Idea Generator.</p>
-                    <button onClick={() => setCurrentPage('checkout')} className="px-6 py-3 bg-purple-600 text-white font-bold rounded-full">Upgrade Now</button>
+                    <button onClick={() => setCurrentPage('checkout', { plan: 'pro' })} className="px-6 py-3 bg-purple-600 text-white font-bold rounded-full">Upgrade Now</button>
                 </div>;
             }
             break;
         case 'checkout':
-            content = <CheckoutPage setCurrentPage={setCurrentPage} user={user} />;
+            content = <CheckoutPage setCurrentPage={setCurrentPage} user={user} {...currentPage.props} />;
             break;
         case 'success':
             content = <SuccessPage setCurrentPage={setCurrentPage} />;
@@ -331,7 +338,7 @@ function App() {
   
     return (
       <div className="min-h-screen bg-gray-900 text-gray-200 font-inter">
-        <Header setCurrentPage={setCurrentPage} userIsAuthenticated={!!user} onLogout={handleLogout} />
+        <Header setCurrentPage={setCurrentPage} userIsAuthenticated={!!user} onLogout={handleLogout} userTier={userTier} />
         {content}
       </div>
     );
