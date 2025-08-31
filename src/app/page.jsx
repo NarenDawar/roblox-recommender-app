@@ -15,11 +15,9 @@ import CancelPage from './cancel/page.jsx';
 import { auth, onAuthStateChanged, db } from '../../firebase.js';
 import { doc, onSnapshot } from 'firebase/firestore';
 
-// test comment
-
-
-// Landing Page Component (No changes needed here)
-const LandingPage = ({ onStartAnalysis, setCurrentPage }) => (
+// --- FIX IS HERE ---
+// Updated LandingPage component to use the new onUpgradeClick handler
+const LandingPage = ({ onStartAnalysis, onUpgradeClick }) => (
     <div className="flex flex-col items-center justify-center min-h-screen p-4 text-gray-200 text-center bg-gray-900 animate-fadeIn">
       <div className="w-full max-w-4xl p-8 bg-gray-800 rounded-3xl shadow-2xl border border-gray-700 space-y-12">
         {/* Hero Section */}
@@ -98,7 +96,8 @@ const LandingPage = ({ onStartAnalysis, setCurrentPage }) => (
                 <li className="flex items-center space-x-2"><CheckCircle className="h-5 w-5 text-green-400"/><span>Deeper analysis</span></li>
                  <li className="flex items-center space-x-2"><CheckCircle className="h-5 w-5 text-green-400"/><span>AI Idea Generator</span></li>
               </ul>
-              <button onClick={() => setCurrentPage('checkout', { plan: 'pro' })} className="mt-6 w-full px-4 py-2 bg-purple-600 text-white font-bold rounded-full shadow-lg hover:bg-purple-700 transition-all duration-300 cursor-pointer">Upgrade to Pro</button>
+              {/* --- FIX IS HERE --- */}
+              <button onClick={() => onUpgradeClick('pro')} className="mt-6 w-full px-4 py-2 bg-purple-600 text-white font-bold rounded-full shadow-lg hover:bg-purple-700 transition-all duration-300 cursor-pointer">Upgrade to Pro</button>
             </div>
             <div className="bg-gray-700 p-6 rounded-2xl border border-gray-600 flex flex-col">
               <h3 className="text-2xl font-bold text-red-400 mb-2">Enterprise</h3>
@@ -112,10 +111,12 @@ const LandingPage = ({ onStartAnalysis, setCurrentPage }) => (
                 <li className="flex items-center space-x-2"><CheckCircle className="h-5 w-5 text-green-400"/><span>Priority Support</span></li>
                 <li className="flex items-center space-x-2"><CheckCircle className="h-5 w-5 text-green-400"/><span>Feature Requests</span></li>
               </ul>
-              <button onClick={() => setCurrentPage('checkout', { plan: 'enterprise' })} className="mt-6 w-full text-center block px-4 py-2 bg-gray-600 text-white font-bold rounded-full shadow-lg hover:bg-gray-700 transition-all duration-300 cursor-pointer">Get Started</button>
+              {/* --- FIX IS HERE --- */}
+              <button onClick={() => onUpgradeClick('enterprise')} className="mt-6 w-full text-center block px-4 py-2 bg-gray-600 text-white font-bold rounded-full shadow-lg hover:bg-gray-700 transition-all duration-300 cursor-pointer">Get Started</button>
             </div>
           </div>
         </div>
+        {/* ... FAQ and other sections remain the same ... */}
         <div className="text-center space-y-6">
           <h2 className="text-4xl font-extrabold text-white tracking-tight">How It Works</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -155,7 +156,7 @@ const LandingPage = ({ onStartAnalysis, setCurrentPage }) => (
         </div>
       </div>
     </div>
-  );
+);
   
 function App() {
     const [idea, setIdea] = useState('');
@@ -245,6 +246,16 @@ function App() {
         setCurrentPage('login');
       }
     };
+    
+    // --- FIX IS HERE ---
+    // New handler to check for a user before sending them to checkout
+    const handleUpgradeClick = (plan) => {
+        if (user) {
+            setCurrentPage('checkout', { plan });
+        } else {
+            setCurrentPage('login');
+        }
+    };
 
     const onStartNewProject = () => {
       setSelectedProject(null);
@@ -273,7 +284,9 @@ function App() {
     } else {
       switch (currentPage.page) {
         case 'landing':
-          content = <LandingPage onStartAnalysis={handleStartAnalysis} setCurrentPage={setCurrentPage} />;
+          // --- FIX IS HERE ---
+          // Pass the new handler to the LandingPage
+          content = <LandingPage onStartAnalysis={handleStartAnalysis} onUpgradeClick={handleUpgradeClick} />;
           break;
         case 'analyzer':
           content = <AnalyzerTool 
@@ -321,8 +334,6 @@ function App() {
         case 'checkout':
             content = <CheckoutPage setCurrentPage={setCurrentPage} user={user} {...currentPage.props} />;
             break;
-        // --- FIX IS HERE ---
-        // Wrap the components that use useSearchParams in a Suspense boundary
         case 'success':
             content = (
               <Suspense fallback={<div className="flex items-center justify-center min-h-screen text-white">Loading...</div>}>
