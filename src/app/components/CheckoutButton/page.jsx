@@ -1,7 +1,9 @@
 import { getAuth } from 'firebase/auth';
 import { getStripe } from '../../utils/stripe';
 
-const CheckoutButton = ({ priceId, plan }) => {
+// --- FIX IS HERE ---
+// Provide a default empty string for the 'plan' prop.
+const CheckoutButton = ({ priceId, plan = '' }) => {
 
   const handleCheckout = async () => {
     const auth = getAuth();
@@ -40,7 +42,7 @@ const CheckoutButton = ({ priceId, plan }) => {
 
   return (
     <button onClick={handleCheckout}>
-      {/* FIX: Text is now dynamic based on the plan prop */}
+      {/* This will now safely render even if the plan is temporarily undefined */}
       Upgrade to {plan.charAt(0).toUpperCase() + plan.slice(1)}
     </button>
   );
