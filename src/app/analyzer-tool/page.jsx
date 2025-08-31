@@ -78,8 +78,9 @@ const CollapsibleSection = ({ icon, title, children, isDisabled = false }) => {
   );
 };
 
-
-const AnalyzerTool = ({ idea, setIdea, analysis, setAnalysis, isLoading, setIsLoading, error, setError, db, user, selectedProject, setCurrentPage, userTier }) => {
+// --- FIX IS HERE ---
+// Provide a default empty string for the 'idea' prop to prevent build errors.
+const AnalyzerTool = ({ idea = '', setIdea, analysis, setAnalysis, isLoading, setIsLoading, error, setError, db, user, selectedProject, setCurrentPage, userTier }) => {
   const [appId] = useState('roblox-analyzer');
   const [parsedAnalysis, setParsedAnalysis] = useState(null);
 
