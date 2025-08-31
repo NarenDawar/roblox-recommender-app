@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react'; // Import Suspense
 import { Sparkles, Handshake, Code, Gauge, Type, Bot, FileText, ChevronDown, CheckCircle, CircleX, Rocket } from 'lucide-react';
 import Header from './header/page.jsx';
 import LoginPage from './login/page.jsx';
@@ -173,12 +173,10 @@ function App() {
       setCurrentPageState({ page, props });
     };
   
-    // --- THE FIX IS HERE ---
     useEffect(() => {
       setDbInstance(db);
       setAuthInstance(auth);
       
-      // Initialize an empty unsubscribe function for the user listener
       let unsubscribeUser = () => {};
 
       const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
@@ -186,18 +184,17 @@ function App() {
         setIsAuthReady(true);
         if (currentUser) {
             const userDocRef = doc(db, 'users', currentUser.uid);
-            // Assign the real unsubscribe function when the user logs in
             unsubscribeUser = onSnapshot(userDocRef, (doc) => {
                 if (doc.exists()) {
                     const data = doc.data();
                     const tier = data.tier || 'free';
                     setUserTier(tier);
+                    const limit = tier === 'pro' ? 50 : (tier === 'enterprise' ? Infinity : 5);
                     setUsage({
                         count: data.analysisCount || 0,
-                        limit: tier === 'pro' ? 50 : 5
+                        limit: limit
                     });
                 } else {
-                    // This case handles a lag between auth and Firestore creation
                     setUserTier('free');
                     setUsage({ count: 0, limit: 5 });
                 }
@@ -214,23 +211,20 @@ function App() {
                 setCurrentPage('dashboard');
             }
         } else {
-            // When the user logs out, call the unsubscribe function to detach the listener
             unsubscribeUser();
             setUserTier('free');
             setCurrentPage('landing');
         }
       });
   
-      // This is the main cleanup function for the useEffect hook
       return () => {
-        unsubscribeAuth(); // Clean up the auth listener
-        unsubscribeUser(); // Also clean up the user listener here to be safe
+        unsubscribeAuth();
+        unsubscribeUser();
       };
-    }, []); // An empty dependency array ensures this runs only once on mount
+    }, []); 
   
     const handleLogout = async () => {
       if (authInstance) {
-        // setCurrentPage('landing') is already handled by onAuthStateChanged
         setIdea('');
         setAnalysis(null);
         setSelectedProject(null);
@@ -291,7 +285,7 @@ function App() {
           setError={setError} 
           db={dbInstance} 
           user={user} 
-          selectedProject={selectedProject} // Pass the whole object
+          selectedProject={selectedProject}
           setCurrentPage={setCurrentPage} 
           userTier={userTier} 
         />;          
@@ -312,7 +306,7 @@ function App() {
           content = <SettingsPage setCurrentPage={setCurrentPage} user={user} />;
           break;
         case 'generator':
-            if (userTier === 'pro') {
+            if (userTier === 'pro' || userTier === 'enterprise') {
                 content = <GeneratorPage setCurrentPage={setCurrentPage} onIdeaGenerated={handleIdeaGenerated} />;
             } else {
                 content = <div className="text-center p-10">
@@ -325,11 +319,21 @@ function App() {
         case 'checkout':
             content = <CheckoutPage setCurrentPage={setCurrentPage} user={user} {...currentPage.props} />;
             break;
+        // --- FIX IS HERE ---
+        // Wrap the components that use useSearchParams in a Suspense boundary
         case 'success':
-            content = <SuccessPage setCurrentPage={setCurrentPage} />;
+            content = (
+              <Suspense fallback={<div className="flex items-center justify-center min-h-screen text-white">Loading...</div>}>
+                <SuccessPage setCurrentPage={setCurrentPage} />
+              </Suspense>
+            );
             break;
         case 'cancel':
-            content = <CancelPage setCurrentPage={setCurrentPage} />;
+            content = (
+              <Suspense fallback={<div className="flex items-center justify-center min-h-screen text-white">Loading...</div>}>
+                <CancelPage setCurrentPage={setCurrentPage} />
+              </Suspense>
+            );
             break;
         default:
           content = <LandingPage onStartAnalysis={handleStartAnalysis} setCurrentPage={setCurrentPage} />;
