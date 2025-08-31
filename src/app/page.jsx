@@ -15,6 +15,8 @@ import CancelPage from './cancel/page.jsx';
 import { auth, onAuthStateChanged, db } from '../../firebase.js';
 import { doc, onSnapshot } from 'firebase/firestore';
 
+// test comment
+
 
 // Landing Page Component (No changes needed here)
 const LandingPage = ({ onStartAnalysis, setCurrentPage }) => (
