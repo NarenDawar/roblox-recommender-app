@@ -9,13 +9,13 @@ const CheckoutPage = ({ setCurrentPage, plan = 'pro' }) => {
     pro: {
       name: 'Pro Plan',
       price: '$10.00 / month',
-      priceId: "price_1S0lhXAaSrBLZiYG8m86YgLQ",
+      priceId: process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID,
       description: "You'll get unlimited access to all pro features, including the Idea Generator, advanced analysis, and unlimited project saves."
     },
     enterprise: {
       name: 'Enterprise Plan',
       price: '$30.00 / month',
-      priceId: 'price_1S0lhjAaSrBLZiYGEI4YrUg0',
+      priceId: process.env.NEXT_PUBLIC_STRIPE_ENTERPRISE_PRICE_ID,
       description: "You'll get unlimited analyses, shared workspaces, and priority support."
     }
   };
